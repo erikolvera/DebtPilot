@@ -162,3 +162,38 @@ def test_empty_portfolio_produces_three_zero_plans():
         assert summary.months_to_payoff == 0
         assert summary.total_interest_paid == ZERO
     assert plans.interest_saved_avalanche_vs_snowball == ZERO
+
+
+from app.engine.models import Schedule
+from app.engine.plans import compute_schedules, summarize_schedules
+
+
+def test_compute_schedules_returns_one_schedule_per_strategy():
+    debts = [debt("a", "500.00", "5.00", "25.00"), debt("b", "2000.00", "25.00", "50.00")]
+    schedules = compute_schedules(debts, Decimal("200.00"))
+    assert set(schedules) == {Strategy.SNOWBALL, Strategy.AVALANCHE, Strategy.MINIMUM_ONLY}
+    for schedule in schedules.values():
+        assert isinstance(schedule, Schedule)
+
+
+def test_schedules_carry_the_per_debt_grid_that_summaries_drop():
+    # This is the whole point: PlanSummary has monthly_totals but no per-debt
+    # rows, so ?detail=full cannot be served from compute_plans alone.
+    debts = [debt("a", "100.00", "12.00", "50.00")]
+    schedules = compute_schedules(debts, ZERO)
+    first_month = schedules[Strategy.AVALANCHE].months[0]
+    assert first_month.debts[0].debt_id == "a"
+    assert first_month.debts[0].interest_charged == Decimal("1.00")
+
+
+def test_summarize_schedules_reproduces_compute_plans_exactly():
+    debts = [debt("a", "500.00", "5.00", "25.00"), debt("b", "2000.00", "25.00", "50.00")]
+    extra = Decimal("200.00")
+    assert summarize_schedules(compute_schedules(debts, extra), debts) == compute_plans(debts, extra)
+
+
+def test_baseline_schedule_ignores_the_extra_payment():
+    debts = [debt("a", "1000.00", "12.00", "100.00")]
+    with_extra = compute_schedules(debts, Decimal("900.00"))[Strategy.MINIMUM_ONLY]
+    without = compute_schedules(debts, ZERO)[Strategy.MINIMUM_ONLY]
+    assert len(with_extra.months) == len(without.months)

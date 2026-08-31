@@ -96,29 +96,36 @@ def _months_delta(worse: PlanSummary, better: PlanSummary) -> int | None:
     return worse.months_to_payoff - better.months_to_payoff
 
 
-def compute_plans(debts: Sequence[Debt], extra_payment: Decimal) -> PlanComparison:
-    """Run all three scenarios and precompute every comparison.
+def compute_schedules(
+    debts: Sequence[Debt], extra_payment: Decimal
+) -> dict[Strategy, Schedule]:
+    """Run all three scenarios and keep the full schedules.
 
-    The deltas exist so the AI layer never performs arithmetic: every number
-    that could appear in a generated sentence is already a field here.
+    The scenario configuration lives here and nowhere else, so a caller that
+    needs the per-debt grid cannot drift from one that only needs summaries.
     """
-    snowball = summarize(
-        simulate(debts, extra_payment, snowball_order, fixed_minimum),
-        debts,
-        Strategy.SNOWBALL,
-    )
-    avalanche = summarize(
-        simulate(debts, extra_payment, avalanche_order, fixed_minimum),
-        debts,
-        Strategy.AVALANCHE,
-    )
-    # The baseline takes no extra payment and does not roll over freed
-    # minimums: "do nothing differently" means that money is spent elsewhere.
-    baseline = summarize(
-        simulate(debts, ZERO, snowball_order, declining_minimum, rollover=False),
-        debts,
-        Strategy.MINIMUM_ONLY,
-    )
+    return {
+        Strategy.SNOWBALL: simulate(
+            debts, extra_payment, snowball_order, fixed_minimum
+        ),
+        Strategy.AVALANCHE: simulate(
+            debts, extra_payment, avalanche_order, fixed_minimum
+        ),
+        # The baseline takes no extra payment and does not roll over freed
+        # minimums: "do nothing differently" means that money is spent elsewhere.
+        Strategy.MINIMUM_ONLY: simulate(
+            debts, ZERO, snowball_order, declining_minimum, rollover=False
+        ),
+    }
+
+
+def summarize_schedules(
+    schedules: dict[Strategy, Schedule], debts: Sequence[Debt]
+) -> PlanComparison:
+    """Fold three schedules into the comparison object."""
+    snowball = summarize(schedules[Strategy.SNOWBALL], debts, Strategy.SNOWBALL)
+    avalanche = summarize(schedules[Strategy.AVALANCHE], debts, Strategy.AVALANCHE)
+    baseline = summarize(schedules[Strategy.MINIMUM_ONLY], debts, Strategy.MINIMUM_ONLY)
 
     return PlanComparison(
         snowball=snowball,
@@ -131,3 +138,12 @@ def compute_plans(debts: Sequence[Debt], extra_payment: Decimal) -> PlanComparis
         months_saved_avalanche_vs_baseline=_months_delta(baseline, avalanche),
         months_saved_avalanche_vs_snowball=_months_delta(snowball, avalanche),
     )
+
+
+def compute_plans(debts: Sequence[Debt], extra_payment: Decimal) -> PlanComparison:
+    """Run all three scenarios and precompute every comparison.
+
+    The deltas exist so the AI layer never performs arithmetic: every number
+    that could appear in a generated sentence is already a field here.
+    """
+    return summarize_schedules(compute_schedules(debts, extra_payment), debts)

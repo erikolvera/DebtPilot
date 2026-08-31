@@ -17,7 +17,7 @@ from .models import (
     Schedule,
     Strategy,
 )
-from .plans import compute_plans, summarize
+from .plans import compute_plans, compute_schedules, summarize, summarize_schedules
 from .simulator import simulate
 
 __all__ = [
@@ -33,6 +33,8 @@ __all__ = [
     "Schedule",
     "Strategy",
     "compute_plans",
+    "compute_schedules",
     "simulate",
     "summarize",
+    "summarize_schedules",
 ]
