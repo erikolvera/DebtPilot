@@ -197,9 +197,9 @@ class DebtCreate(BaseModel):
 
     name: NonBlankName
     type: str = Field(default="credit_card", min_length=1, max_length=40)
-    balance: Money = Field(ge=0, le=Decimal("99999999.99"), decimal_places=2)
+    balance: Money = Field(ge=0, le=MONEY_MAX, decimal_places=2)
     apr: Money = Field(ge=0, le=Decimal("999.99"), decimal_places=2)
-    minimum_payment: Money = Field(ge=0, le=Decimal("99999999.99"), decimal_places=2)
+    minimum_payment: Money = Field(ge=0, le=MONEY_MAX, decimal_places=2)
 
 
 class DebtUpdate(BaseModel):
@@ -210,13 +210,13 @@ class DebtUpdate(BaseModel):
     name: NonBlankName | None = None
     type: str | None = Field(default=None, min_length=1, max_length=40)
     balance: Money | None = Field(
-        default=None, ge=0, le=Decimal("99999999.99"), decimal_places=2
+        default=None, ge=0, le=MONEY_MAX, decimal_places=2
     )
     apr: Money | None = Field(
         default=None, ge=0, le=Decimal("999.99"), decimal_places=2
     )
     minimum_payment: Money | None = Field(
-        default=None, ge=0, le=Decimal("99999999.99"), decimal_places=2
+        default=None, ge=0, le=MONEY_MAX, decimal_places=2
     )
 
     @model_validator(mode="after")

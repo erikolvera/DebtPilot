@@ -247,6 +247,7 @@ def test_cors_preflight_allows_every_verb_the_api_serves(monkeypatch):
     for verb in ("GET", "POST", "PATCH", "DELETE"):
         assert verb in allowed
 
+
 def test_a_body_over_the_size_cap_is_a_413(client):
     # `max_length=20` on `debts` runs only after the whole body is buffered
     # and parsed, so it is not a request-size cap. This is.

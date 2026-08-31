@@ -101,6 +101,7 @@ def test_update_touches_updated_at(user_a):
         )
     assert updated.updated_at > created.updated_at
 
+
 def test_delete_reports_whether_a_row_went(user_a):
     with user_scoped_connection(user_a) as conn:
         debt_id = str(repo.create_debt(conn, user_a, make()).id)
