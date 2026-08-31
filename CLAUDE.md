@@ -285,12 +285,14 @@ Debts
 - DELETE /debts/{id}
 
 Payoff plans
-- POST /payoff-plans, takes an extra_monthly_payment, returns snowball,
-  avalanche, and the minimums-only baseline, plus the precomputed
-  comparison deltas. Accepts `?detail=full` to include the per-debt
-  month-by-month grid.
-- GET /payoff-plans
-- GET /payoff-plans/{id}
+- POST /v1/payoff-plans — built. Stateless: debts arrive in the request body.
+  Returns snowball, avalanche, and the minimums-only baseline, plus the six
+  precomputed comparison deltas. `?detail=full` adds the per-debt
+  month-by-month grid. Money is a JSON string in both directions; a bare
+  number is a 422. `start_month` (YYYY-MM) is required — the API reads no
+  clock, so a response is a pure function of its request.
+- A portfolio that never pays off is a 200, not an error.
+- GET /payoff-plans, GET /payoff-plans/{id} — deferred until persistence exists.
 
 AI guidance
 - POST /payoff-plans/{id}/explain, generates a natural-language
@@ -335,5 +337,8 @@ The engine is a framework-free package inside the backend:
 - Keep the LLM provider behind a small interface (e.g. a single
   `generate_guidance()` function) so switching providers later is a small
   change, not a rewrite.
+- FastAPI and Pydantic live only under `app/api/`. The engine imports no
+  framework, and route handlers are `def`, not `async def`, because the
+  engine is CPU-bound and FastAPI runs sync handlers in a threadpool.
 - Never hardcode API keys or database URLs. Use environment variables and
   keep a `.env.example` file up to date.

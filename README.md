@@ -93,10 +93,41 @@ Both real bugs found during development were caught by these layers rather
 than by review: a payment floor that inflated sub-$25 minimums, and an
 unsound termination check that declared some paying-off portfolios hopeless.
 
+## Running the API
+
+```bash
+cd backend
+.venv/bin/uvicorn app.api.main:app --reload
+```
+
+Interactive docs at `http://127.0.0.1:8000/docs`; health check at `/health`.
+
+`POST /v1/payoff-plans` takes a portfolio and returns all three scenarios plus
+every precomputed comparison. Add `?detail=full` for the per-debt
+month-by-month schedule.
+
+Money is a JSON **string** in both directions. JSON has no decimal type, so
+accepting bare numbers would reintroduce floats at the boundary of a
+Decimal-only engine — a number where a string belongs is a 422, not a silent
+coercion. `start_month` (`YYYY-MM`) is required rather than defaulted from the
+server clock, which keeps a response a pure function of its request.
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/payoff-plans \
+  -H 'content-type: application/json' \
+  -d '{"debts":[{"id":"a","name":"Visa","balance":"2000.00","apr":"24.99","minimum_payment":"50.00"}],
+       "extra_monthly_payment":"200.00","start_month":"2026-09"}'
+```
+
+A portfolio that never pays off comes back as a 200 with
+`"outcome": "never_pays_off"`, not an error. HTTP status describes whether the
+request was answerable, never whether the answer was good news.
+
 ## Roadmap
 
 - [x] Debt engine
-- [ ] FastAPI layer — debts CRUD, `POST /payoff-plans`
+- [x] Payoff plan API — stateless `POST /v1/payoff-plans`
+- [ ] Debts CRUD with persistence
 - [ ] Supabase Postgres + auth
 - [ ] AI guidance layer (Gemini, behind a provider interface)
 - [ ] Next.js frontend
