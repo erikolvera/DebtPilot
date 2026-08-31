@@ -142,3 +142,46 @@ def test_surplus_larger_than_the_whole_portfolio_is_not_overpaid():
     assert len(schedule.months) == 1
     assert schedule.months[0].total_payment == Decimal("100.00")
     assert schedule.months[0].remaining_balance == ZERO
+
+
+def test_negative_amortization_is_a_result_not_an_exception():
+    # $1,000 at 24% accrues $20.00/month against a $10.00 minimum. The balance
+    # grows forever, and the user needs to be told exactly that.
+    schedule = run([debt("a", "1000.00", "24.00", "10.00")])
+    assert schedule.outcome is Outcome.NEVER_PAYS_OFF
+    assert schedule.underwater_debt_ids == ("a",)
+
+
+def test_no_progress_is_detected_in_the_first_month():
+    schedule = run([debt("a", "1000.00", "24.00", "10.00")])
+    assert len(schedule.months) == 1
+
+
+def test_underwater_run_still_returns_its_partial_schedule():
+    schedule = run([debt("a", "1000.00", "24.00", "10.00")])
+    assert schedule.months[0].total_interest == Decimal("20.00")
+    assert schedule.months[0].total_payment == Decimal("10.00")
+
+
+def test_extra_payment_can_rescue_an_underwater_debt():
+    schedule = run([debt("a", "1000.00", "24.00", "10.00")], extra="500.00")
+    assert schedule.outcome is Outcome.PAID_OFF
+
+
+def test_max_months_backstop_stops_glacial_progress():
+    # $100,000 at 1.2% accrues $100.00/month against a $101.01 minimum:
+    # one dollar and one cent of progress per month would run for millennia without the backstop.
+    schedule = run([debt("a", "100000.00", "1.20", "101.01")])
+    assert schedule.outcome is Outcome.NEVER_PAYS_OFF
+    assert len(schedule.months) == 1200
+
+
+def test_zero_minimum_and_zero_extra_never_pays_off():
+    schedule = run([debt("a", "500.00", "18.00", "0.00")])
+    assert schedule.outcome is Outcome.NEVER_PAYS_OFF
+
+
+def test_a_healthy_run_is_still_paid_off():
+    schedule = run([debt("a", "100.00", "12.00", "50.00")])
+    assert schedule.outcome is Outcome.PAID_OFF
+    assert schedule.underwater_debt_ids == ()

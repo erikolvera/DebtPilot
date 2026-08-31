@@ -65,11 +65,10 @@ def simulate(
     balances: dict[str, Decimal] = {d.id: d.balance for d in active_debts}
     months: list[Month] = []
     freed_pool = ZERO
+    previous_total = sum(balances.values(), ZERO)
 
     for index in range(1, MAX_MONTHS + 1):
         active = [d for d in active_debts if balances[d.id] > ZERO]
-        if not active:
-            break
 
         starting = {d.id: balances[d.id] for d in active}
 
@@ -110,5 +109,31 @@ def simulate(
                     freed_pool += scheduled[d.id]
 
         months.append(_build_month(index, active, starting, interest, payments, balances))
+
+        total_remaining = sum(balances.values(), ZERO)
+        if total_remaining <= ZERO:
+            break
+        if total_remaining >= previous_total:
+            # The budget is fixed while interest compounds, so if a month ends
+            # no better than it started, no later month can do better either.
+            underwater = tuple(
+                sorted(d.id for d in active if balances[d.id] >= starting[d.id])
+            )
+            return Schedule(
+                months=tuple(months),
+                outcome=Outcome.NEVER_PAYS_OFF,
+                underwater_debt_ids=underwater,
+            )
+        previous_total = total_remaining
+    else:
+        # MAX_MONTHS exhausted without clearing: glacial but positive progress.
+        underwater = tuple(
+            sorted(d.id for d in active_debts if balances[d.id] > ZERO)
+        )
+        return Schedule(
+            months=tuple(months),
+            outcome=Outcome.NEVER_PAYS_OFF,
+            underwater_debt_ids=underwater,
+        )
 
     return Schedule(months=tuple(months), outcome=Outcome.PAID_OFF)
