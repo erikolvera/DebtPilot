@@ -7,16 +7,19 @@ calculations — they are folds over the schedule the simulator already built.
 from collections.abc import Sequence
 from decimal import Decimal
 
+from .minimums import declining_minimum, fixed_minimum
 from .models import (
     Debt,
     DebtPayoff,
     MonthlyTotal,
     Outcome,
+    PlanComparison,
     PlanSummary,
     Schedule,
     Strategy,
 )
-from .simulator import ZERO
+from .ordering import avalanche_order, snowball_order
+from .simulator import ZERO, simulate
 
 
 def summarize(
@@ -73,4 +76,58 @@ def summarize(
         total_paid=total_paid,
         debt_payoffs=debt_payoffs if paid_off else (),
         monthly_totals=tuple(monthly_totals),
+    )
+
+
+def _interest_delta(worse: PlanSummary, better: PlanSummary) -> Decimal | None:
+    """How much interest ``better`` saves against ``worse``.
+
+    ``None`` when either side never pays off: you cannot subtract from a plan
+    with no end.
+    """
+    if worse.outcome is not Outcome.PAID_OFF or better.outcome is not Outcome.PAID_OFF:
+        return None
+    return worse.total_interest_paid - better.total_interest_paid
+
+
+def _months_delta(worse: PlanSummary, better: PlanSummary) -> int | None:
+    if worse.months_to_payoff is None or better.months_to_payoff is None:
+        return None
+    return worse.months_to_payoff - better.months_to_payoff
+
+
+def compute_plans(debts: Sequence[Debt], extra_payment: Decimal) -> PlanComparison:
+    """Run all three scenarios and precompute every comparison.
+
+    The deltas exist so the AI layer never performs arithmetic: every number
+    that could appear in a generated sentence is already a field here.
+    """
+    snowball = summarize(
+        simulate(debts, extra_payment, snowball_order, fixed_minimum),
+        debts,
+        Strategy.SNOWBALL,
+    )
+    avalanche = summarize(
+        simulate(debts, extra_payment, avalanche_order, fixed_minimum),
+        debts,
+        Strategy.AVALANCHE,
+    )
+    # The baseline takes no extra payment and does not roll over freed
+    # minimums: "do nothing differently" means that money is spent elsewhere.
+    baseline = summarize(
+        simulate(debts, ZERO, snowball_order, declining_minimum, rollover=False),
+        debts,
+        Strategy.MINIMUM_ONLY,
+    )
+
+    return PlanComparison(
+        snowball=snowball,
+        avalanche=avalanche,
+        baseline=baseline,
+        interest_saved_snowball_vs_baseline=_interest_delta(baseline, snowball),
+        interest_saved_avalanche_vs_baseline=_interest_delta(baseline, avalanche),
+        interest_saved_avalanche_vs_snowball=_interest_delta(snowball, avalanche),
+        months_saved_snowball_vs_baseline=_months_delta(baseline, snowball),
+        months_saved_avalanche_vs_baseline=_months_delta(baseline, avalanche),
+        months_saved_avalanche_vs_snowball=_months_delta(snowball, avalanche),
     )

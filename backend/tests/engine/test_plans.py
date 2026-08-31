@@ -88,3 +88,77 @@ def test_never_pays_off_reports_null_months_and_underwater_ids():
     assert summary.months_to_payoff is None
     assert summary.underwater_debt_ids == ("a",)
     assert summary.debt_payoffs == ()
+
+
+from app.engine.plans import compute_plans
+
+
+def test_compute_plans_labels_each_scenario():
+    debts = [debt("a", "500.00", "5.00", "25.00"), debt("b", "2000.00", "25.00", "50.00")]
+    plans = compute_plans(debts, Decimal("200.00"))
+    assert plans.snowball.strategy is Strategy.SNOWBALL
+    assert plans.avalanche.strategy is Strategy.AVALANCHE
+    assert plans.baseline.strategy is Strategy.MINIMUM_ONLY
+
+
+def test_avalanche_never_costs_more_interest_than_snowball():
+    debts = [debt("a", "500.00", "5.00", "25.00"), debt("b", "2000.00", "25.00", "50.00")]
+    plans = compute_plans(debts, Decimal("200.00"))
+    assert plans.avalanche.total_interest_paid <= plans.snowball.total_interest_paid
+
+
+def test_snowball_clears_the_small_debt_first():
+    debts = [debt("a", "500.00", "5.00", "25.00"), debt("b", "2000.00", "25.00", "50.00")]
+    plans = compute_plans(debts, Decimal("200.00"))
+    assert plans.snowball.debt_payoffs[0].debt_id == "a"
+    assert plans.avalanche.debt_payoffs[0].debt_id == "b"
+
+
+def test_baseline_is_slower_and_costlier_than_both_strategies():
+    debts = [debt("a", "500.00", "5.00", "25.00"), debt("b", "2000.00", "25.00", "50.00")]
+    plans = compute_plans(debts, Decimal("200.00"))
+    assert plans.baseline.months_to_payoff > plans.avalanche.months_to_payoff
+    assert plans.baseline.total_interest_paid > plans.avalanche.total_interest_paid
+
+
+def test_deltas_are_the_arithmetic_the_ai_layer_must_not_do():
+    debts = [debt("a", "500.00", "5.00", "25.00"), debt("b", "2000.00", "25.00", "50.00")]
+    plans = compute_plans(debts, Decimal("200.00"))
+    assert plans.interest_saved_avalanche_vs_snowball == (
+        plans.snowball.total_interest_paid - plans.avalanche.total_interest_paid
+    )
+    assert plans.interest_saved_avalanche_vs_baseline == (
+        plans.baseline.total_interest_paid - plans.avalanche.total_interest_paid
+    )
+    assert plans.months_saved_avalanche_vs_baseline == (
+        plans.baseline.months_to_payoff - plans.avalanche.months_to_payoff
+    )
+
+
+def test_deltas_are_none_when_the_baseline_never_pays_off():
+    # 1% implied minimum against a 2% monthly rate: the baseline is underwater,
+    # but a large extra payment still clears both strategies.
+    debts = [debt("a", "10000.00", "24.00", "100.00")]
+    plans = compute_plans(debts, Decimal("3000.00"))
+    assert plans.baseline.outcome is Outcome.NEVER_PAYS_OFF
+    assert plans.avalanche.outcome is Outcome.PAID_OFF
+    assert plans.interest_saved_avalanche_vs_baseline is None
+    assert plans.months_saved_avalanche_vs_baseline is None
+    # The strategy-vs-strategy delta is still a real number.
+    assert plans.interest_saved_avalanche_vs_snowball is not None
+
+
+def test_baseline_ignores_the_extra_payment():
+    debts = [debt("a", "1000.00", "12.00", "100.00")]
+    small = compute_plans(debts, Decimal("0.00"))
+    large = compute_plans(debts, Decimal("900.00"))
+    assert small.baseline.months_to_payoff == large.baseline.months_to_payoff
+    assert small.baseline.total_interest_paid == large.baseline.total_interest_paid
+
+
+def test_empty_portfolio_produces_three_zero_plans():
+    plans = compute_plans([], Decimal("100.00"))
+    for summary in (plans.snowball, plans.avalanche, plans.baseline):
+        assert summary.months_to_payoff == 0
+        assert summary.total_interest_paid == ZERO
+    assert plans.interest_saved_avalanche_vs_snowball == ZERO
