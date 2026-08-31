@@ -63,3 +63,11 @@ def test_implied_percentage_of_zero_minimum_is_zero():
 
 def test_implied_percentage_of_zero_balance_is_zero():
     assert implied_percentage(make_debt(balance="0.00")) == Decimal(0)
+
+
+def test_floor_never_exceeds_the_stored_minimum():
+    # A $10 stored minimum must not be inflated to $25 by the floor —
+    # the floor is $25 or the user's own minimum, whichever is smaller.
+    debt = make_debt(minimum="10.00")
+    # implied pct = 1%; at balance 400 scaled = 4.00, so the 10.00 floor wins
+    assert declining_minimum(debt, Decimal("400.00")) == Decimal("10.00")

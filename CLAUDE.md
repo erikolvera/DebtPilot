@@ -70,10 +70,12 @@ the simulation loop.
 because the total monthly outlay is held constant at
 `sum(minimums at t=0) + extra` for the whole payoff, so a shrinking minimum
 just frees cash for the target debt. The minimums-only baseline instead
-recomputes each month as `max($25, implied_pct * balance)`, where
-`implied_pct` is derived at t=0 as `stored_minimum / starting_balance`. No
+recomputes each month as `max(min($25, stored_minimum), implied_pct * balance)`,
+where `implied_pct` is derived at t=0 as `stored_minimum / starting_balance`. No
 extra user input required. If `stored_minimum` is zero, the declining minimum
-is zero too — the $25 floor must not manufacture a payment the user never had.
+is zero too. More generally, the floor is $25 or the user's own stored
+minimum, whichever is smaller — it must not manufacture a payment the user
+never had.
 
 **Negative amortization is a result, not an exception.** If a debt's minimum
 is less than its monthly interest, the balance grows forever. That is a

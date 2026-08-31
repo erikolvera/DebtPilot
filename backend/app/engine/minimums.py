@@ -35,12 +35,15 @@ def implied_percentage(debt: Debt) -> Decimal:
 
 
 def declining_minimum(debt: Debt, balance: Decimal) -> Decimal:
-    """A minimum that shrinks with the balance, floored at ``MINIMUM_FLOOR``.
+    """A minimum that shrinks with the balance, floored at the LESSER of
+    ``MINIMUM_FLOOR`` and the debt's own stored minimum.
 
-    A debt with no stored minimum keeps no minimum: the floor must not
-    manufacture a payment the user never had.
+    The floor must never manufacture a payment larger than the one the user
+    actually has: a $10 stored minimum stays a $10 floor, and a debt with no
+    stored minimum keeps no minimum at all.
     """
     if debt.minimum_payment <= 0:
         return Decimal("0.00")
+    floor = min(MINIMUM_FLOOR, debt.minimum_payment)
     scaled = implied_percentage(debt) * balance
-    return to_cents(max(MINIMUM_FLOOR, scaled))
+    return to_cents(max(floor, scaled))

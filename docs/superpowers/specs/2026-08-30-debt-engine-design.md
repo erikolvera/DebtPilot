@@ -55,14 +55,16 @@ so a shrinking real-world minimum would only free cash that the model already
 directs at the target debt.
 
 The minimums-only baseline instead recomputes each month as
-`max($25, implied_pct * balance)`, where `implied_pct` is derived once at
-month zero as `stored_minimum / starting_balance`. This requires no additional
-user input, which matters because users do not know their card's minimum
-payment formula.
+`max(floor, implied_pct * balance)`, where `floor = min($25, stored_minimum)`
+and `implied_pct` is derived once at month zero as
+`stored_minimum / starting_balance`. This requires no additional user input,
+which matters because users do not know their card's minimum payment formula.
 
-If `stored_minimum` is zero, the declining minimum is zero as well. The $25
-floor must not manufacture a payment the user never had, and letting it do so
-would contradict section 7, where a zero minimum is explicitly left to the
+If `stored_minimum` is zero, the declining minimum is zero as well. More
+generally, the floor is $25 or the user's own stored minimum, whichever is
+smaller, so it can never exceed what the user actually pays. The floor must
+not manufacture a payment the user never had, and letting it do so would
+contradict section 7, where a zero minimum is explicitly left to the
 no-progress check.
 
 The baseline exists because it is the only scenario that answers "why should I
