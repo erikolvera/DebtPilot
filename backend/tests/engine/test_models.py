@@ -81,3 +81,104 @@ def test_valid_portfolio_passes():
 
 def test_empty_portfolio_passes():
     validate_portfolio([], Decimal("0.00"))
+
+
+from app.engine.models import (
+    DebtMonth,
+    DebtPayoff,
+    Month,
+    MonthlyTotal,
+    Outcome,
+    PlanComparison,
+    PlanSummary,
+    Schedule,
+    Strategy,
+)
+
+
+def test_strategy_values():
+    assert Strategy.SNOWBALL.value == "snowball"
+    assert Strategy.AVALANCHE.value == "avalanche"
+    assert Strategy.MINIMUM_ONLY.value == "minimum_only"
+
+
+def test_outcome_values():
+    assert Outcome.PAID_OFF.value == "paid_off"
+    assert Outcome.NEVER_PAYS_OFF.value == "never_pays_off"
+
+
+def make_month(index=1) -> Month:
+    row = DebtMonth(
+        debt_id="d1",
+        starting_balance=Decimal("100.00"),
+        interest_charged=Decimal("1.00"),
+        payment_applied=Decimal("50.00"),
+        ending_balance=Decimal("51.00"),
+    )
+    return Month(
+        index=index,
+        debts=(row,),
+        total_payment=Decimal("50.00"),
+        total_interest=Decimal("1.00"),
+        remaining_balance=Decimal("51.00"),
+    )
+
+
+def test_schedule_defaults_to_no_underwater_debts():
+    schedule = Schedule(months=(make_month(),), outcome=Outcome.PAID_OFF)
+    assert schedule.underwater_debt_ids == ()
+
+
+def test_schedule_carries_the_outcome():
+    # simulate() returns a Schedule, so the Schedule must record how the run
+    # ended — the outcome cannot live only on PlanSummary.
+    schedule = Schedule(
+        months=(), outcome=Outcome.NEVER_PAYS_OFF, underwater_debt_ids=("d1",)
+    )
+    assert schedule.outcome is Outcome.NEVER_PAYS_OFF
+    assert schedule.underwater_debt_ids == ("d1",)
+
+
+def test_result_types_are_frozen():
+    month = make_month()
+    with pytest.raises(Exception):
+        month.index = 2
+
+
+def test_plan_summary_allows_null_months_when_never_pays_off():
+    summary = PlanSummary(
+        strategy=Strategy.MINIMUM_ONLY,
+        outcome=Outcome.NEVER_PAYS_OFF,
+        months_to_payoff=None,
+        underwater_debt_ids=("d1",),
+        total_interest_paid=Decimal("500.00"),
+        total_paid=Decimal("500.00"),
+        debt_payoffs=(),
+        monthly_totals=(MonthlyTotal(1, Decimal("10.00"), Decimal("1.00")),),
+    )
+    assert summary.months_to_payoff is None
+
+
+def test_plan_comparison_allows_null_deltas():
+    summary = PlanSummary(
+        strategy=Strategy.SNOWBALL,
+        outcome=Outcome.PAID_OFF,
+        months_to_payoff=3,
+        underwater_debt_ids=(),
+        total_interest_paid=Decimal("1.53"),
+        total_paid=Decimal("101.53"),
+        debt_payoffs=(DebtPayoff("d1", "Visa", 3, Decimal("1.53")),),
+        monthly_totals=(),
+    )
+    comparison = PlanComparison(
+        snowball=summary,
+        avalanche=summary,
+        baseline=summary,
+        interest_saved_snowball_vs_baseline=None,
+        interest_saved_avalanche_vs_baseline=None,
+        interest_saved_avalanche_vs_snowball=Decimal("0.00"),
+        months_saved_snowball_vs_baseline=None,
+        months_saved_avalanche_vs_baseline=None,
+        months_saved_avalanche_vs_snowball=0,
+    )
+    assert comparison.interest_saved_snowball_vs_baseline is None

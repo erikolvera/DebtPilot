@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import Enum
 
 from .errors import InvalidDebt
 from .money import to_cents, to_rate_precision
@@ -54,3 +55,101 @@ def validate_portfolio(debts: Sequence[Debt], extra_payment: Decimal) -> None:
         if debt.id in seen:
             raise InvalidDebt(f"duplicate debt id {debt.id!r}")
         seen.add(debt.id)
+
+
+class Strategy(Enum):
+    SNOWBALL = "snowball"
+    AVALANCHE = "avalanche"
+    MINIMUM_ONLY = "minimum_only"
+
+
+class Outcome(Enum):
+    PAID_OFF = "paid_off"
+    NEVER_PAYS_OFF = "never_pays_off"
+
+
+@dataclass(frozen=True)
+class DebtMonth:
+    """One debt's activity in one month."""
+
+    debt_id: str
+    starting_balance: Decimal
+    interest_charged: Decimal
+    payment_applied: Decimal
+    ending_balance: Decimal
+
+
+@dataclass(frozen=True)
+class Month:
+    """One month across every active debt. ``index`` is 1-based."""
+
+    index: int
+    debts: tuple[DebtMonth, ...]
+    total_payment: Decimal
+    total_interest: Decimal
+    remaining_balance: Decimal
+
+
+@dataclass(frozen=True)
+class Schedule:
+    """The full simulation record, plus how the run ended.
+
+    ``simulate`` returns this, so it has to carry the outcome; the summary
+    layer above it cannot invent one.
+    """
+
+    months: tuple[Month, ...]
+    outcome: Outcome
+    underwater_debt_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class MonthlyTotal:
+    """A compact per-month row for charting, without the per-debt grid."""
+
+    index: int
+    remaining_balance: Decimal
+    cumulative_interest: Decimal
+
+
+@dataclass(frozen=True)
+class DebtPayoff:
+    debt_id: str
+    name: str
+    payoff_month: int
+    total_interest_paid: Decimal
+
+
+@dataclass(frozen=True)
+class PlanSummary:
+    """What crosses the API boundary for one scenario."""
+
+    strategy: Strategy
+    outcome: Outcome
+    months_to_payoff: int | None
+    underwater_debt_ids: tuple[str, ...]
+    total_interest_paid: Decimal
+    total_paid: Decimal
+    debt_payoffs: tuple[DebtPayoff, ...]
+    monthly_totals: tuple[MonthlyTotal, ...]
+
+
+@dataclass(frozen=True)
+class PlanComparison:
+    """All three scenarios plus every delta the AI layer is allowed to state.
+
+    Verbose on purpose. Every number that could appear in a sentence the model
+    writes must already exist as a field here, so the prompt says "describe
+    these figures" rather than "work out the difference". Deltas are nullable
+    because you cannot subtract from a plan that never pays off.
+    """
+
+    snowball: PlanSummary
+    avalanche: PlanSummary
+    baseline: PlanSummary
+    interest_saved_snowball_vs_baseline: Decimal | None
+    interest_saved_avalanche_vs_baseline: Decimal | None
+    interest_saved_avalanche_vs_snowball: Decimal | None
+    months_saved_snowball_vs_baseline: int | None
+    months_saved_avalanche_vs_baseline: int | None
+    months_saved_avalanche_vs_snowball: int | None
