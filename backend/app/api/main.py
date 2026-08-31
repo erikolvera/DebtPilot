@@ -14,6 +14,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.engine import InvalidDebt
 
+from .repositories.debts import DebtLimitReached
+from .routers import debts as debts_router
 from .routers import payoff_plans
 
 DEFAULT_ORIGIN = "http://localhost:3000"
@@ -88,6 +90,18 @@ def handle_invalid_debt(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+def handle_debt_limit(request: Request, exc: Exception) -> JSONResponse:
+    """The per-user debt cap, surfaced as a 422 in FastAPI's error envelope."""
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": [
+                {"type": "debt_limit_reached", "loc": ["body"], "msg": str(exc)}
+            ]
+        },
+    )
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="DebtPilot API", version="1.0.0")
 
@@ -110,7 +124,9 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    app.add_exception_handler(DebtLimitReached, handle_debt_limit)
     app.include_router(payoff_plans.router, prefix="/v1")
+    app.include_router(debts_router.router, prefix="/v1")
     return app
 
 
