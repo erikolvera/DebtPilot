@@ -113,22 +113,37 @@ def simulate(
         total_remaining = sum(balances.values(), ZERO)
         if total_remaining <= ZERO:
             break
-        if total_remaining >= previous_total:
-            # The budget is fixed while interest compounds, so if a month ends
-            # no better than it started, no later month can do better either.
-            underwater = tuple(
-                sorted(d.id for d in active if balances[d.id] >= starting[d.id])
-            )
+        if total_remaining >= previous_total and all(
+            interest[d.id] > scheduled[d.id] + extra_payment + freed_pool
+            for d in active
+        ):
+            # Sound early exit: every active debt's interest exceeds its
+            # scheduled minimum plus ALL distributable surplus, so even aiming
+            # the entire surplus at any single debt would leave it growing.
+            # Every balance is then non-decreasing under any allocation, no
+            # debt can ever clear, the freed pool never grows, and each month
+            # is strictly worse — a real induction. A mere total-balance stall
+            # is NOT proof: in a mixed-APR portfolio a high-APR debt can pay
+            # down while a low-APR one grows, and once the first debt clears
+            # its freed minimum can rescue the rest. When the condition fails
+            # we keep simulating; MAX_MONTHS is the unconditional backstop.
             return Schedule(
                 months=tuple(months),
                 outcome=Outcome.NEVER_PAYS_OFF,
-                underwater_debt_ids=underwater,
+                underwater_debt_ids=tuple(sorted(d.id for d in active)),
             )
         previous_total = total_remaining
     else:
-        # MAX_MONTHS exhausted without clearing: glacial but positive progress.
+        # MAX_MONTHS exhausted without clearing. Underwater means interest
+        # outran the payment in the final simulated month — a glacial but
+        # healthy debt (payment beats interest, horizon merely past the cap)
+        # is not underwater, and the tuple may be empty.
         underwater = tuple(
-            sorted(d.id for d in active_debts if balances[d.id] > ZERO)
+            sorted(
+                row.debt_id
+                for row in months[-1].debts
+                if row.interest_charged > row.payment_applied
+            )
         )
         return Schedule(
             months=tuple(months),

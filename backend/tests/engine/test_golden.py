@@ -120,3 +120,14 @@ def test_golden_divergent_run_conserves_money():
         schedule = simulate(debts, Decimal("200.00"), order_fn, fixed_minimum)
         summary = summarize(schedule, debts, strategy)
         assert summary.total_paid == Decimal("2500.00") + summary.total_interest_paid
+
+
+def test_golden_stalled_total_can_still_pay_off():
+    # T pays down $10/month while U grows $10/month: total balance is flat in
+    # month 1, but T clears in ~4 years and its freed $40 minimum then drowns
+    # U. A naive "total stopped shrinking" exit calls this NEVER_PAYS_OFF —
+    # the definitive wrong answer for a user who escapes in 9 years.
+    debts = [debt("t", "1000.00", "36.00", "40.00"), debt("u", "1000.00", "24.00", "10.00")]
+    schedule = simulate(debts, ZERO, snowball_order, fixed_minimum)
+    assert schedule.outcome is Outcome.PAID_OFF
+    assert len(schedule.months) == 109

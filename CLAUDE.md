@@ -147,13 +147,14 @@ constant at `sum(initial minimums) + extra` for the whole run, which makes
 that invariant a consequence of the formula rather than something to remember.
 
 **Termination.** Two mechanisms, since a hang is the worst possible failure
-here. First, a no-progress check: if a month ends with total balance at or
-above where it started, no later month can do better, because the budget is
-fixed while interest compounds. Second, a hard `MAX_MONTHS = 1200` backstop.
-Both produce the `NEVER_PAYS_OFF` outcome. There is also a cheap pre-flight
-for the obvious case: under `declining_minimum`, a debt is doomed from the
-start when its implied percentage is below its monthly rate, since both sides
-scale with balance and the ratio never moves.
+here. First, a sound early exit: a total-balance stall alone proves nothing —
+a high-APR debt can pay down while a low-APR one grows, and the first freed
+minimum can still rescue the rest — so the engine exits early only when the
+total stalled AND every active debt's interest exceeds its scheduled minimum
+plus all distributable surplus (extra plus freed pool), making rescue
+impossible under any allocation. Second, a hard `MAX_MONTHS = 1200` backstop,
+whose underwater ids name only debts whose interest outran their payment in
+the final simulated month. Both produce the `NEVER_PAYS_OFF` outcome.
 
 **Engine data model.** Frozen dataclasses, tuples not lists, no Pydantic and
 no FastAPI imports inside the engine package.

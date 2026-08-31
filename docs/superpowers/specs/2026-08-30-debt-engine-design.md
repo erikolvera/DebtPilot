@@ -316,15 +316,22 @@ it is the single best assertion in the test suite.
 
 A hang is the worst possible failure mode here, so there are two mechanisms:
 
-1. **No-progress check.** If a month ends with total balance at or above where
-   it started, no later month can do better — the budget is fixed while
-   interest compounds. Emit `NEVER_PAYS_OFF` with the offending debt ids.
-2. **Hard cap.** `MAX_MONTHS = 1200` (100 years) as a backstop, producing the
-   same outcome.
-
-A cheap pre-flight covers the obvious case: under `declining_minimum`, a debt
-is doomed from month zero when its implied percentage is below its monthly
-rate, since both sides scale linearly with balance and the ratio never moves.
+1. **Sound early exit.** A total-balance stall alone is NOT proof of
+   never-pays-off: in a mixed-APR portfolio a high-APR debt can pay down
+   while a low-APR one grows, stalling the total, and the portfolio can
+   still clear once the first debt's freed minimum rolls over. The engine
+   therefore exits early with `NEVER_PAYS_OFF` only when a month ends no
+   better than it started AND every active debt's interest exceeds its
+   scheduled minimum plus all distributable surplus (extra payment plus
+   freed pool). Under that condition rescue is impossible under any
+   allocation — even aiming the entire surplus at a single debt leaves it
+   growing — so no debt can ever clear, the freed pool never grows, and
+   each month is strictly worse. Every active debt is named underwater.
+2. **Hard cap.** `MAX_MONTHS = 1200` (100 years) as the unconditionally
+   sound backstop, producing the same outcome; on this path
+   `underwater_debt_ids` names only debts whose interest outran their
+   payment in the final simulated month — possibly none, for a glacial but
+   healthy portfolio.
 
 ### Never-pays-off is a result, not an exception
 
@@ -390,7 +397,7 @@ Generate random portfolios; assert what must hold for every input.
 |---|---|
 | `sum(payments) + final remaining balance == sum(initial balances) + sum(interest)` | Nearly every arithmetic bug; no dollar created or destroyed. Stated with the remainder so it holds for `NEVER_PAYS_OFF` runs too |
 | Under `rollover=True`, each month's `total_payment` equals `sum(initial minimums) + extra`, except the last | Budget and rollover errors |
-| Total remaining balance strictly decreases each month when `PAID_OFF` | Stalls and phantom months |
+| A `PAID_OFF` run ends at exactly zero, no month's remaining balance is negative, and the run fits inside the cap | Stalls and phantom months — stated terminally, because strict month-over-month decrease is a false theorem: a mixed-APR portfolio can stall its total and still clear once a freed minimum rolls over |
 | No balance is ever negative | Missing final-payment truncation |
 | Every balance is an exact cent multiple | Rounding leaks |
 | `avalanche.total_interest <= snowball.total_interest` | Ordering wired backwards |

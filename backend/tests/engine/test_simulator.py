@@ -170,10 +170,11 @@ def test_extra_payment_can_rescue_an_underwater_debt():
 
 def test_max_months_backstop_stops_glacial_progress():
     # $100,000 at 1.2% accrues $100.00/month against a $101.01 minimum:
-    # one dollar and one cent of progress per month would run for millennia without the backstop.
+    # one dollar and one cent of progress per month would run for centuries without the backstop.
     schedule = run([debt("a", "100000.00", "1.20", "101.01")])
     assert schedule.outcome is Outcome.NEVER_PAYS_OFF
     assert len(schedule.months) == 1200
+    assert schedule.underwater_debt_ids == ()
 
 
 def test_zero_minimum_and_zero_extra_never_pays_off():
@@ -185,3 +186,14 @@ def test_a_healthy_run_is_still_paid_off():
     schedule = run([debt("a", "100.00", "12.00", "50.00")])
     assert schedule.outcome is Outcome.PAID_OFF
     assert schedule.underwater_debt_ids == ()
+
+
+def test_cap_path_underwater_ids_name_only_debts_interest_outruns():
+    # T is glacial but healthy (payment beats interest); U is genuinely
+    # underwater. T cannot clear within the cap, so the run exhausts
+    # MAX_MONTHS — and only U belongs in underwater_debt_ids.
+    debts = [debt("t", "100000.00", "1.20", "101.01"), debt("u", "1000.00", "24.00", "10.00")]
+    schedule = run(debts)
+    assert schedule.outcome is Outcome.NEVER_PAYS_OFF
+    assert len(schedule.months) == 1200
+    assert schedule.underwater_debt_ids == ("u",)

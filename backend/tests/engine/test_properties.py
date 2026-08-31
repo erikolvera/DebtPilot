@@ -114,15 +114,20 @@ def test_total_outlay_is_constant_under_rollover(portfolio):
 
 @given(portfolios())
 @SLOW
-def test_total_balance_strictly_decreases_when_paid_off(portfolio):
+def test_paid_off_runs_end_at_exactly_zero(portfolio):
+    # Strict month-over-month decrease is a false theorem: a high-APR debt
+    # can pay down while a low-APR debt grows, stalling the total, and the
+    # portfolio still clears once the first debt's minimum rolls over. What
+    # is always true: the run ends at exactly zero, never dips negative,
+    # and fits inside the cap.
     debts, extra = portfolio
     schedule = simulate(debts, extra, avalanche_order, fixed_minimum)
     if schedule.outcome is not Outcome.PAID_OFF:
         return
-    previous = sum((d.balance for d in debts), ZERO)
+    assert schedule.months == () or schedule.months[-1].remaining_balance == ZERO
     for month in schedule.months:
-        assert month.remaining_balance < previous
-        previous = month.remaining_balance
+        assert month.remaining_balance >= ZERO
+    assert len(schedule.months) <= 1200
 
 
 @given(portfolios())
@@ -177,3 +182,17 @@ def test_simulate_always_terminates_within_the_cap(portfolio):
     debts, extra = portfolio
     schedule = simulate(debts, extra, snowball_order, fixed_minimum)
     assert len(schedule.months) <= 1200
+
+
+@given(portfolios())
+@SLOW
+def test_early_never_pays_off_verdicts_are_truthful(portfolio):
+    # An early (pre-cap) NEVER_PAYS_OFF must mean it: every debt it names
+    # ended its final month with interest exceeding the payment it received.
+    debts, extra = portfolio
+    schedule = simulate(debts, extra, snowball_order, fixed_minimum)
+    if schedule.outcome is Outcome.NEVER_PAYS_OFF and len(schedule.months) < 1200:
+        rows = {r.debt_id: r for r in schedule.months[-1].debts}
+        assert schedule.underwater_debt_ids
+        for debt_id in schedule.underwater_debt_ids:
+            assert rows[debt_id].interest_charged > rows[debt_id].payment_applied
