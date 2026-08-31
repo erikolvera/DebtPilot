@@ -152,11 +152,30 @@ which closes the table-owner path, though it is currently redundant because
 the owner is that same bypassing role — it starts mattering if ownership ever
 moves.
 
+The policies call `public.request_user_id()` rather than Supabase's
+`auth.uid()`. Reaching `auth.uid()` from a restricted role requires either a
+grant Postgres silently refuses to make, or membership in Supabase's
+`authenticated` role — which was measured to hand `app_user` read and write
+access to any future table in `public`. Reading the request setting directly
+removes the dependency instead of duplicating it.
+
 Local development needs Docker running and the Supabase CLI:
 
 ```bash
-cd backend && supabase start   # prints the DB URL; connect as app_user
+cd backend
+supabase start                    # prints the admin DB URL
+./scripts/bootstrap_local_db.sh   # gives app_user a login for local use
 ```
+
+The second step is separate on purpose. The migration creates `app_user` with
+no password, because that file is what `supabase db push` applies to the hosted
+project — a literal there would publish a credential for a role that can
+impersonate any user. Set the production password in the Supabase dashboard.
+
+**Before the first deploy**, confirm your Supabase project issues asymmetric
+tokens: `curl {SUPABASE_URL}/auth/v1/.well-known/jwks.json` should return an EC
+key. Projects still on the legacy shared JWT secret sign with HS256, which this
+code deliberately does not accept.
 
 ## Roadmap
 

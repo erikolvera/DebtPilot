@@ -21,9 +21,11 @@ jobs:
           python-version: "3.12"
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 2.22.6
       - name: Start Supabase
         run: supabase start
+      - name: Grant the app role a login
+        run: ./scripts/bootstrap_local_db.sh
       - name: Install
         run: pip install -e ".[dev]"
       - name: Test with coverage gate

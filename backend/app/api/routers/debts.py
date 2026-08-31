@@ -4,6 +4,8 @@ Every handler resolves the user from the verified token, opens one
 user-scoped transaction, and delegates to the repository.
 """
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from ..auth import current_user_id
@@ -14,6 +16,10 @@ from ..schemas import DebtCreate, DebtOut, DebtUpdate
 router = APIRouter()
 
 NOT_FOUND = "debt not found"
+
+# debt_id is uuid.UUID, not str: an unparseable id must be a 422 from FastAPI
+# before it reaches SQL. Typed str, "not-a-uuid" reaches a uuid column and
+# raises DataError with no handler -- a 500 from a malformed URL.
 
 
 # Plain `def`, not `async def`: these handlers do blocking database work, so
@@ -34,10 +40,10 @@ def list_debts(user_id: str = Depends(current_user_id)) -> list[DebtOut]:
 
 @router.patch("/debts/{debt_id}", response_model=DebtOut)
 def update_debt(
-    debt_id: str, changes: DebtUpdate, user_id: str = Depends(current_user_id)
+    debt_id: uuid.UUID, changes: DebtUpdate, user_id: str = Depends(current_user_id)
 ) -> DebtOut:
     with user_scoped_connection(user_id) as conn:
-        row = repo.update_debt(conn, user_id, debt_id, changes)
+        row = repo.update_debt(conn, user_id, str(debt_id), changes)
     if row is None:
         # 404 for both "no such debt" and "not yours": distinguishing them
         # would confirm the row exists in another account.
@@ -46,9 +52,11 @@ def update_debt(
 
 
 @router.delete("/debts/{debt_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_debt(debt_id: str, user_id: str = Depends(current_user_id)) -> Response:
+def delete_debt(
+    debt_id: uuid.UUID, user_id: str = Depends(current_user_id)
+) -> Response:
     with user_scoped_connection(user_id) as conn:
-        deleted = repo.delete_debt(conn, user_id, debt_id)
+        deleted = repo.delete_debt(conn, user_id, str(debt_id))
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=NOT_FOUND)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

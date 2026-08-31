@@ -13,7 +13,7 @@ from sqlalchemy.engine import Connection, Row
 
 from ..schemas import MAX_DEBTS_PER_USER, DebtCreate, DebtUpdate
 
-__all__ = ["MAX_DEBTS_PER_USER", "DebtLimitReached", "count_debts", "create_debt", "delete_debt", "get_debt", "list_debts", "update_debt"]
+__all__ = ["MAX_DEBTS_PER_USER", "DebtLimitReached", "count_debts", "create_debt", "delete_debt", "list_debts", "update_debt"]
 
 _COLUMNS = "id, name, type, balance, apr, minimum_payment, created_at, updated_at"
 
@@ -41,21 +41,19 @@ def list_debts(conn: Connection, user_id: str) -> Sequence[Row]:
     ).all()
 
 
-def get_debt(conn: Connection, user_id: str, debt_id: str) -> Row | None:
-    return conn.execute(
-        text(f"select {_COLUMNS} from public.debts "
-             "where user_id = :user_id and id = :id"),
-        {"user_id": user_id, "id": debt_id},
-    ).one_or_none()
-
-
 def create_debt(conn: Connection, user_id: str, data: DebtCreate) -> Row:
     """Insert one debt, enforcing the per-user cap in the same transaction.
 
-    Counting and inserting together is what makes the cap meaningful: two
-    concurrent requests cannot both observe a count below the limit and both
-    insert, because the transaction serializes them.
+    The advisory lock is what makes the cap meaningful. Postgres defaults to
+    READ COMMITTED, so without it two concurrent requests at the limit minus
+    one would both read a count below the limit and both insert. The lock is
+    per-user and transaction-scoped, so it serializes only a single account's
+    writes and releases at COMMIT.
     """
+    conn.execute(
+        text("select pg_advisory_xact_lock(hashtextextended(:user_id, 0))"),
+        {"user_id": user_id},
+    )
     if count_debts(conn, user_id) >= MAX_DEBTS_PER_USER:
         raise DebtLimitReached(f"a user may store at most {MAX_DEBTS_PER_USER} debts")
     return conn.execute(

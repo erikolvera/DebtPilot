@@ -57,7 +57,7 @@ class DebtIn(BaseModel):
     id: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=120)
     balance: Money = Field(ge=0, le=MONEY_MAX)
-    apr: Money = Field(ge=0, le=Decimal("999.99"))
+    apr: Money = Field(ge=0, le=Decimal("999.99"), decimal_places=2)
     minimum_payment: Money = Field(ge=0, le=MONEY_MAX)
 
 
@@ -169,6 +169,10 @@ def _non_blank(value: Any) -> Any:
     "empty" means.
     """
     if isinstance(value, str):
+        if "\x00" in value:
+            # Postgres text columns cannot hold NUL, and psycopg raises on the
+            # way in -- a 500 from a request that otherwise validates.
+            raise ValueError("must not contain NUL bytes")
         stripped = value.strip()
         if not stripped:
             raise ValueError("must not be blank")
@@ -193,9 +197,9 @@ class DebtCreate(BaseModel):
 
     name: NonBlankName
     type: str = Field(default="credit_card", min_length=1, max_length=40)
-    balance: Money = Field(ge=0, le=Decimal("99999999.99"))
-    apr: Money = Field(ge=0, le=Decimal("999.99"))
-    minimum_payment: Money = Field(ge=0, le=Decimal("99999999.99"))
+    balance: Money = Field(ge=0, le=Decimal("99999999.99"), decimal_places=2)
+    apr: Money = Field(ge=0, le=Decimal("999.99"), decimal_places=2)
+    minimum_payment: Money = Field(ge=0, le=Decimal("99999999.99"), decimal_places=2)
 
 
 class DebtUpdate(BaseModel):
@@ -205,10 +209,14 @@ class DebtUpdate(BaseModel):
 
     name: NonBlankName | None = None
     type: str | None = Field(default=None, min_length=1, max_length=40)
-    balance: Money | None = Field(default=None, ge=0, le=Decimal("99999999.99"))
-    apr: Money | None = Field(default=None, ge=0, le=Decimal("999.99"))
+    balance: Money | None = Field(
+        default=None, ge=0, le=Decimal("99999999.99"), decimal_places=2
+    )
+    apr: Money | None = Field(
+        default=None, ge=0, le=Decimal("999.99"), decimal_places=2
+    )
     minimum_payment: Money | None = Field(
-        default=None, ge=0, le=Decimal("99999999.99")
+        default=None, ge=0, le=Decimal("99999999.99"), decimal_places=2
     )
 
     @model_validator(mode="after")

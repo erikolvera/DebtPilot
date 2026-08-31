@@ -230,19 +230,22 @@ def test_cors_does_not_advertise_credentialed_requests(monkeypatch):
     assert "access-control-allow-credentials" not in response.headers
 
 
-def test_cors_preflight_allows_only_get_and_post(monkeypatch):
+def test_cors_preflight_allows_every_verb_the_api_serves(monkeypatch):
+    # PATCH and DELETE were added with the debts routes; omitting them here
+    # would leave the browser unable to call edit or delete cross-origin,
+    # which no same-origin TestClient test would ever notice.
     monkeypatch.setenv("ALLOWED_ORIGINS", "https://app.example")
     client = TestClient(create_app())
     response = client.options(
-        "/v1/payoff-plans",
+        "/v1/debts",
         headers={
             "Origin": "https://app.example",
-            "Access-Control-Request-Method": "DELETE",
+            "Access-Control-Request-Method": "PATCH",
         },
     )
-    allowed = response.headers.get("access-control-allow-methods", "")
-    assert "DELETE" not in allowed
-
+    allowed = response.headers["access-control-allow-methods"]
+    for verb in ("GET", "POST", "PATCH", "DELETE"):
+        assert verb in allowed
 
 def test_a_body_over_the_size_cap_is_a_413(client):
     # `max_length=20` on `debts` runs only after the whole body is buffered

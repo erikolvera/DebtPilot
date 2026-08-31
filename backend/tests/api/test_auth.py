@@ -156,3 +156,46 @@ def test_jwk_client_points_at_the_configured_project():
         assert client.uri == "https://test.supabase.co/auth/v1/.well-known/jwks.json"
     finally:
         _REAL_JWK_CLIENT.cache_clear()
+
+
+def test_a_token_without_an_expiry_is_rejected(signing_key):
+    # PyJWT checks exp when present but does not require it, so without the
+    # explicit `require` a signature-valid token with no exp never expires.
+    token = jwt.encode(
+        {"sub": str(uuid.uuid4()), "aud": "authenticated", "iss": ISSUER},
+        signing_key,
+        algorithm="ES256",
+    )
+    with pytest.raises(HTTPException) as exc:
+        auth.verify_token(token)
+    assert exc.value.status_code == 401
+
+
+def test_an_unreachable_key_service_is_a_503_not_a_401(monkeypatch, signing_key):
+    # An outage is not a bad credential. Reporting 401 sends whoever is on
+    # call hunting an auth bug instead of an unreachable dependency.
+    from jwt.exceptions import PyJWKClientError
+
+    class _Broken:
+        def get_signing_key_from_jwt(self, token):
+            raise PyJWKClientError("cannot fetch keys")
+
+    monkeypatch.setattr(auth, "jwk_client", lambda: _Broken())
+    with pytest.raises(HTTPException) as exc:
+        auth.verify_token(make_token(signing_key))
+    assert exc.value.status_code == 503
+
+
+def test_a_token_with_an_empty_subject_is_rejected(signing_key):
+    # `require` checks that a claim is present, not that it says anything.
+    # An empty subject would otherwise scope every query to nobody -- a silent
+    # failure rather than a loud one.
+    token = jwt.encode(
+        {"sub": "", "aud": "authenticated", "iss": ISSUER, "exp": int(time.time()) + 60},
+        signing_key,
+        algorithm="ES256",
+    )
+    with pytest.raises(HTTPException) as exc:
+        auth.verify_token(token)
+    assert exc.value.status_code == 401
+    assert "subject" in exc.value.detail

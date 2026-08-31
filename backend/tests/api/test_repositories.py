@@ -63,19 +63,6 @@ def test_list_ordering_is_deterministic_within_one_transaction(user_a):
     assert sorted(first) == ["a", "b", "c"]
 
 
-def test_get_returns_the_row_for_its_owner(user_a):
-    with user_scoped_connection(user_a) as conn:
-        debt_id = repo.create_debt(conn, user_a, make()).id
-        assert repo.get_debt(conn, user_a, str(debt_id)).name == "Visa"
-
-
-def test_get_returns_none_for_another_users_debt(user_a, user_b):
-    with user_scoped_connection(user_a) as conn:
-        debt_id = repo.create_debt(conn, user_a, make()).id
-    with user_scoped_connection(user_b) as conn:
-        assert repo.get_debt(conn, user_b, str(debt_id)) is None
-
-
 def test_update_applies_only_the_supplied_fields(user_a):
     with user_scoped_connection(user_a) as conn:
         debt_id = repo.create_debt(conn, user_a, make()).id
@@ -102,13 +89,17 @@ def test_update_returns_none_for_another_users_debt(user_a, user_b):
 
 
 def test_update_touches_updated_at(user_a):
+    # Two transactions on purpose. now() is the TRANSACTION timestamp, so a
+    # create and an update inside one transaction share it -- and this test
+    # would then pass even with the trigger deleted, since updated_at would
+    # simply keep its equal insert value.
     with user_scoped_connection(user_a) as conn:
         created = repo.create_debt(conn, user_a, make())
+    with user_scoped_connection(user_a) as conn:
         updated = repo.update_debt(
             conn, user_a, str(created.id), DebtUpdate(name="Renamed")
         )
-    assert updated.updated_at >= created.updated_at
-
+    assert updated.updated_at > created.updated_at
 
 def test_delete_reports_whether_a_row_went(user_a):
     with user_scoped_connection(user_a) as conn:

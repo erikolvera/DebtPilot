@@ -44,16 +44,16 @@ def test_user_scoped_connection_sets_the_claims(user_a):
         assert json.loads(claims)["sub"] == user_a
 
 
-def test_auth_uid_resolves_inside_the_transaction(user_a):
+def test_the_request_user_id_resolves_inside_the_transaction(user_a):
     with user_scoped_connection(user_a) as conn:
-        assert str(conn.execute(text("select auth.uid()")).scalar_one()) == user_a
+        assert str(conn.execute(text("select public.request_user_id()")).scalar_one()) == user_a
 
 
 def test_claims_do_not_leak_to_a_later_connection(user_a):
     with user_scoped_connection(user_a) as conn:
-        assert conn.execute(text("select auth.uid()")).scalar_one() is not None
+        assert conn.execute(text("select public.request_user_id()")).scalar_one() is not None
     # A fresh transaction must start with no identity. Had set_config been
     # called with is_local=false, a pooled connection would carry the previous
     # user's id into this one.
     with get_engine().begin() as conn:
-        assert conn.execute(text("select auth.uid()")).scalar_one() is None
+        assert conn.execute(text("select public.request_user_id()")).scalar_one() is None

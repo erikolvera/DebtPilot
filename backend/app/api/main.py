@@ -115,7 +115,7 @@ def create_app() -> FastAPI:
         # requests grant nothing today — and the flag becomes a live footgun
         # the moment someone sets ALLOWED_ORIGINS=*.
         allow_credentials=False,
-        allow_methods=["GET", "POST"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["*"],
     )
     app.add_exception_handler(InvalidDebt, handle_invalid_debt)

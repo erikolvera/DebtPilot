@@ -16,7 +16,7 @@ from ..db import user_scoped_connection
 from ..repositories import debts as debts_repo
 
 from ..mappers import to_response
-from ..schemas import Money, PayoffPlanRequest, PayoffPlanResponse
+from ..schemas import MONEY_MAX, Money, PayoffPlanRequest, PayoffPlanResponse
 
 router = APIRouter()
 
@@ -58,7 +58,7 @@ def create_payoff_plan(
 
 @router.get("/me/payoff-plan", response_model=PayoffPlanResponse)
 def my_payoff_plan(
-    extra_monthly_payment: Money = Query(ge=0, le=Decimal("99999999.99")),
+    extra_monthly_payment: Money = Query(ge=0, le=MONEY_MAX),
     start_month: str = Query(pattern=MONTH_PATTERN),
     detail: Literal["full"] | None = Query(
         default=None,

@@ -113,22 +113,42 @@ def test_clean_debts_actually_deletes(db_engine, user_a):
     assert count_after == 0
 
 
-def test_app_user_can_resolve_auth_uid():
-    # The grant statements assert their own success (they'd raise on a typo),
-    # but a `grant ... on schema auth` can execute without error and still
-    # grant nothing: Postgres downgrades a grant the runner lacks authority
-    # to make into a WARNING, not a failure. Prove the privilege actually
-    # landed by having app_user itself call auth.uid(), the same way the RLS
-    # policies on public.debts do.
-    user_id = str(uuid.uuid4())
+def test_app_user_can_resolve_the_request_user_id():
+    """The policies call public.request_user_id(), so app_user must be able to.
+
+    This is the test that would have caught the original defect: the migration's
+    `grant usage on schema auth` ran without error but granted nothing, so
+    asserting the statement executed proved nothing. Only exercising the
+    privilege as app_user does.
+    """
     engine = create_engine(APP_DB_URL, future=True)
     try:
         with engine.begin() as conn:
+            assert conn.execute(text("select public.request_user_id()")).scalar_one() is None
+            user_id = "11111111-1111-1111-1111-111111111111"
             conn.execute(
-                text("select set_config('request.jwt.claims', :claims, true)"),
-                {"claims": json.dumps({"sub": user_id})},
+                text("select set_config('request.jwt.claims', :c, true)"),
+                {"c": '{"sub": "%s"}' % user_id},
             )
-            resolved = conn.execute(text("select auth.uid()")).scalar_one()
-        assert str(resolved) == user_id
+            assert str(conn.execute(text("select public.request_user_id()")).scalar_one()) == user_id
     finally:
         engine.dispose()
+
+
+def test_app_user_has_no_privileges_on_other_public_tables(db_conn):
+    """app_user must not inherit access to tables it was never granted.
+
+    Membership in Supabase's `authenticated` role would have given exactly
+    that -- measured: select and insert on a brand-new public table with no
+    RLS -- which is why the policies use our own function instead.
+    """
+    db_conn.execute(text("create table public.privilege_probe (id int)"))
+    try:
+        for privilege in ("select", "insert", "update", "delete"):
+            granted = db_conn.execute(
+                text("select has_table_privilege('app_user', 'public.privilege_probe', :p)"),
+                {"p": privilege},
+            ).scalar_one()
+            assert granted is False, f"app_user unexpectedly has {privilege}"
+    finally:
+        db_conn.execute(text("drop table public.privilege_probe"))

@@ -11,6 +11,7 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
+from jwt.exceptions import PyJWKClientError
 
 # auto_error=False is required: HTTPBearer's default raises 403 when the
 # header is missing, and the contract for this API is 401.
@@ -42,12 +43,24 @@ def verify_token(token: str) -> str:
     issuer = f"{supabase_url()}/auth/v1"
     try:
         key = jwk_client().get_signing_key_from_jwt(token).key
+    except PyJWKClientError as exc:
+        # An unreachable JWKS endpoint is an outage, not a bad credential.
+        # Reporting 401 here sends the on-call engineer hunting an auth bug.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="cannot reach the identity provider",
+        ) from exc
+
+    try:
         claims = jwt.decode(
             token,
             key,
             algorithms=["ES256"],
             audience="authenticated",
             issuer=issuer,
+            # exp is checked when present but not required by default, so a
+            # signature-valid token without it would never expire.
+            options={"require": ["exp", "sub", "aud", "iss"]},
         )
     except Exception as exc:  # PyJWT raises several unrelated types
         raise HTTPException(

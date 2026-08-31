@@ -113,3 +113,17 @@ def test_a_non_string_name_is_a_clean_validation_error():
     # normal 422 rather than an AttributeError from calling .strip() on an int.
     with pytest.raises(ValidationError):
         DebtCreate(**payload(name=123))
+
+
+def test_a_nul_byte_in_the_name_is_rejected():
+    # Postgres text columns cannot hold NUL and psycopg raises on the way in,
+    # so without this the request validates and then 500s.
+    with pytest.raises(ValidationError, match="NUL"):
+        DebtCreate(**payload(name="ab\x00cd"))
+
+
+def test_sub_cent_money_is_rejected_rather_than_silently_rounded():
+    # numeric(10,2) would round "1.005" to 1.01 invisibly; the engine's
+    # contract is that quantization happens on ingest, not in the database.
+    with pytest.raises(ValidationError):
+        DebtCreate(**payload(balance="1.005"))

@@ -129,3 +129,17 @@ def test_the_twenty_first_debt_is_a_422(user_a):
     response = client.post("/v1/debts", json=payload(name="too many"))
     assert response.status_code == 422
     assert response.json()["detail"][0]["type"] == "debt_limit_reached"
+
+
+def test_a_malformed_debt_id_is_a_422_not_a_500(user_a):
+    # Typed str, this reaches a uuid column and raises DataError with no
+    # handler -- a 500 from a malformed URL.
+    client = client_for(user_a)
+    assert client.patch("/v1/debts/not-a-uuid", json={"name": "x"}).status_code == 422
+    assert client.delete("/v1/debts/not-a-uuid").status_code == 422
+
+
+def test_a_nul_byte_in_the_name_is_a_422_not_a_500(user_a):
+    assert client_for(user_a).post(
+        "/v1/debts", json=payload(name="ab\x00cd")
+    ).status_code == 422
