@@ -59,5 +59,16 @@ begin
 end
 $$;
 
-grant usage on schema public, auth to app_user;
+grant usage on schema public to app_user;
+
+-- Not `grant usage on schema auth to app_user`: schema auth is owned by
+-- supabase_admin, and the `postgres` role running this migration has no
+-- grant option on it, so that statement downgrades to a silent
+-- WARNING: no privileges were granted for "auth" instead of an error --
+-- app_user ends up unable to call auth.uid() at all, and nothing here says
+-- so. Membership in Supabase's own `authenticated` role sidesteps that: it
+-- already carries usage on schema auth and execute on auth.uid(), and it is
+-- nobypassrls, so app_user's RLS isolation is unaffected.
+grant authenticated to app_user;
+
 grant select, insert, update, delete on public.debts to app_user;

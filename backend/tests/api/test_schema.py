@@ -4,7 +4,12 @@ These fail if the migration is edited in a way that silently removes a
 protection, which is exactly the class of change that has no other symptom.
 """
 
-from sqlalchemy import text
+import json
+import uuid
+
+from sqlalchemy import create_engine, text
+
+from tests.api.conftest import APP_DB_URL
 
 
 def test_debts_table_exists(db_conn):
@@ -106,3 +111,24 @@ def test_clean_debts_actually_deletes(db_engine, user_a):
     with db_engine.begin() as conn:
         count_after = conn.execute(text("select count(*) from public.debts")).scalar_one()
     assert count_after == 0
+
+
+def test_app_user_can_resolve_auth_uid():
+    # The grant statements assert their own success (they'd raise on a typo),
+    # but a `grant ... on schema auth` can execute without error and still
+    # grant nothing: Postgres downgrades a grant the runner lacks authority
+    # to make into a WARNING, not a failure. Prove the privilege actually
+    # landed by having app_user itself call auth.uid(), the same way the RLS
+    # policies on public.debts do.
+    user_id = str(uuid.uuid4())
+    engine = create_engine(APP_DB_URL, future=True)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text("select set_config('request.jwt.claims', :claims, true)"),
+                {"claims": json.dumps({"sub": user_id})},
+            )
+            resolved = conn.execute(text("select auth.uid()")).scalar_one()
+        assert str(resolved) == user_id
+    finally:
+        engine.dispose()
