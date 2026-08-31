@@ -213,3 +213,16 @@ def test_money_serializes_back_out_as_a_json_string():
 def test_scenarios_requires_all_three():
     with pytest.raises(ValidationError):
         ScenariosOut(snowball=ScenarioOut(**scenario_payload("snowball")))
+
+
+def test_money_accepts_a_decimal_from_internal_construction():
+    # The validator guards INBOUND JSON. A Decimal cannot come from JSON
+    # parsing (which yields str/int/float), so it must pass: this is the
+    # mapper building a response out of engine output.
+    scenario = ScenarioOut(**scenario_payload(total_interest_paid=Decimal("412.88")))
+    assert scenario.total_interest_paid == Decimal("412.88")
+
+
+def test_a_bool_is_still_rejected_as_money():
+    with pytest.raises(ValidationError, match="JSON string"):
+        DebtIn(**debt_payload(balance=True))

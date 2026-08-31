@@ -15,19 +15,24 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 from .dates import MONTH_PATTERN
 
 
-def _reject_non_string(value: Any) -> Any:
+def _reject_json_numbers(value: Any) -> Any:
     """Refuse money that arrives as a JSON number.
 
     `JSON.parse("1234.56")` yields an IEEE-754 double and 1234.56 is not
     exactly representable, so accepting bare numbers would reintroduce floats
     at the boundary of an engine whose whole discipline is excluding them.
+
+    `Decimal` is allowed through because it cannot come from JSON: parsing
+    only ever produces `str`, `int`, or `float`. A `Decimal` here means the
+    mapper is constructing a response from engine output, which is exactly
+    the value we want and the direction this guard is not aimed at.
     """
-    if not isinstance(value, str):
-        raise ValueError('money must be a JSON string, e.g. "1234.56"')
-    return value
+    if isinstance(value, (str, Decimal)):
+        return value
+    raise ValueError('money must be a JSON string, e.g. "1234.56"')
 
 
-Money = Annotated[Decimal, BeforeValidator(_reject_non_string)]
+Money = Annotated[Decimal, BeforeValidator(_reject_json_numbers)]
 
 
 class DebtIn(BaseModel):
