@@ -231,10 +231,10 @@ on a fixed list never catch this.
 
 ## Database schema (rough draft, refine as the app grows)
 
-**users**
-- id (uuid, PK)
-- email (text, unique)
-- created_at (timestamp)
+**users** — not a table. Supabase Auth owns `auth.users`; mirroring it would
+create a second source of truth for identity. `debts.user_id` references it
+directly, with `on delete cascade`. Add a `public.profiles` table later if
+profile data is ever needed.
 
 **debts**
 Named `debts` rather than `credit_cards` so it can extend to other loan
@@ -246,7 +246,6 @@ types later without a rename.
 - balance (numeric(10,2))
 - apr (numeric(5,2))
 - minimum_payment (numeric(10,2))
-- statement_day (int, nullable)
 - created_at, updated_at (timestamp)
 
 **payoff_plans**
@@ -278,11 +277,14 @@ caching it would be storing a derived value to save nothing.
 
 ## API endpoints (rough draft)
 
-Debts
-- POST /debts
-- GET /debts
-- PATCH /debts/{id}
-- DELETE /debts/{id}
+Debts — built. All require a Supabase bearer token, and all enforce isolation
+through both an explicit `user_id` filter and row-level security.
+- POST /v1/debts, GET /v1/debts, PATCH /v1/debts/{id}, DELETE /v1/debts/{id}
+- Maximum 20 debts per user, enforced at insert so the payoff route inherits it.
+- A foreign or unknown debt id is a 404, never a 403.
+- GET /v1/me/payoff-plan — the signed-in user's plan from their stored debts.
+  POST /v1/payoff-plans stays stateless and unauthenticated: it is the
+  anonymous try-before-you-sign-up path.
 
 Payoff plans
 - POST /v1/payoff-plans — built. Stateless: debts arrive in the request body.
@@ -340,5 +342,13 @@ The engine is a framework-free package inside the backend:
 - FastAPI and Pydantic live only under `app/api/`. The engine imports no
   framework, and route handlers are `def`, not `async def`, because the
   engine is CPU-bound and FastAPI runs sync handlers in a threadpool.
+- Every database query runs inside `user_scoped_connection`, which sets
+  `request.jwt.claims` transaction-locally so row-level security can resolve
+  `auth.uid()`. Never use `SET LOCAL` for this: it cannot take a bind
+  parameter, and a session-scoped setting leaks one user's identity to the
+  next request on a pooled connection.
+- The application connects to Postgres as `app_user` (`nosuperuser`,
+  `nobypassrls`), never as `postgres`, which has `rolbypassrls = true` and
+  would ignore every policy while every test still passed.
 - Never hardcode API keys or database URLs. Use environment variables and
   keep a `.env.example` file up to date.

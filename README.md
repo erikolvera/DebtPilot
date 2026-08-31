@@ -126,11 +126,43 @@ A portfolio that never pays off comes back as a 200 with
 `"outcome": "never_pays_off"`, not an error. HTTP status describes whether the
 request was answerable, never whether the answer was good news.
 
+### Authenticated endpoints
+
+Signed-in users manage their debts through the API rather than writing to
+Postgres directly, so the money rules live in one place.
+
+```
+POST   /v1/debts             create        GET /v1/debts        list
+PATCH  /v1/debts/{id}        partial edit  DELETE /v1/debts/{id}
+GET    /v1/me/payoff-plan?extra_monthly_payment=200.00&start_month=2026-09
+```
+
+All require a Supabase `Authorization: Bearer <jwt>` header. A user may store
+up to 20 debts, enforced at insert so the payoff route inherits the bound.
+A debt that does not exist — or belongs to someone else — returns 404 rather
+than 403, so the API never confirms a row exists in another account.
+
+Isolation is enforced twice: every query filters on `user_id`, and row-level
+security policies enforce the same rule inside Postgres. **The mechanism that
+does the work is the database role.** The application connects as `app_user`,
+created by the migration with `nosuperuser` and `nobypassrls`; Supabase's
+default `postgres` role has `rolbypassrls = true` and would ignore every
+policy while every test still passed. `FORCE ROW LEVEL SECURITY` is also set,
+which closes the table-owner path, though it is currently redundant because
+the owner is that same bypassing role — it starts mattering if ownership ever
+moves.
+
+Local development needs Docker running and the Supabase CLI:
+
+```bash
+cd backend && supabase start   # prints the DB URL; connect as app_user
+```
+
 ## Roadmap
 
 - [x] Debt engine
 - [x] Payoff plan API — stateless `POST /v1/payoff-plans`
-- [ ] Debts CRUD with persistence
+- [x] Debts CRUD with persistence (Supabase Auth, Postgres, row-level security)
 - [ ] Supabase Postgres + auth
 - [ ] AI guidance layer (Gemini, behind a provider interface)
 - [ ] Next.js frontend
