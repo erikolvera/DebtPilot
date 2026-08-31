@@ -53,16 +53,33 @@ worth deciding deliberately: the safety would be coming from a downstream
 rounding step, not from the wire format being correct.
 
 This is enforced, not merely documented. A reusable annotated type rejects
-non-string input:
+money that arrives as a JSON number:
 
 ```python
-def _reject_non_string(v: Any) -> Any:
-    if not isinstance(v, str):
-        raise ValueError('money must be a JSON string, e.g. "1234.56"')
-    return v
+def _reject_json_numbers(value: Any) -> Any:
+    if isinstance(value, (str, Decimal)):
+        return value
+    raise ValueError('money must be a JSON string, e.g. "1234.56"')
 
-Money = Annotated[Decimal, BeforeValidator(_reject_non_string)]
+Money = Annotated[
+    Decimal, BeforeValidator(_reject_json_numbers, json_schema_input_type=str)
+]
 ```
+
+The guard is aimed at JSON numbers, not at every non-`str`. A `Decimal` is
+allowed through because it cannot come from JSON: parsing only ever yields
+`str`, `int`, or `float`. A `Decimal` reaching this validator means the mapper
+is building a response out of engine output — exactly the value we want, and
+the opposite of the direction being guarded. Rejecting it would make the
+response models unusable by the one caller that constructs them.
+
+`json_schema_input_type=str` is load-bearing rather than decorative. A
+`BeforeValidator` does not change the generated JSON schema on its own, so
+without it OpenAPI advertises request-side money as `number | string` while
+the code rejects numbers. Since the frontend's types are generated from that
+schema (section 3.4), the published contract would be a lie the client's
+compiler believes. A test asserts `create_app().openapi()` types
+`DebtIn.balance` as a string.
 
 A client sending `1234.56` gets a 422 naming the field and the fix. Pydantic v2
 serializes `Decimal` to a JSON string on the way out, so responses need no
@@ -203,13 +220,13 @@ both halves.
 class DebtIn(BaseModel):
     id: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=120)
-    balance: Money = Field(ge=0)
+    balance: Money = Field(ge=0, le=MONEY_MAX)
     apr: Money = Field(ge=0, le=Decimal("999.99"))
-    minimum_payment: Money = Field(ge=0)
+    minimum_payment: Money = Field(ge=0, le=MONEY_MAX)
 
 class PayoffPlanRequest(BaseModel):
-    debts: list[DebtIn] = Field(max_length=50)
-    extra_monthly_payment: Money = Field(ge=0)
+    debts: list[DebtIn] = Field(max_length=20)
+    extra_monthly_payment: Money = Field(ge=0, le=MONEY_MAX)
     start_month: str = Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])$")
 ```
 
@@ -220,13 +237,35 @@ An empty `debts` list is valid and yields three zero-month scenarios, matching
 the engine, where "no debts yet" is the normal state of a new account rather
 than an error.
 
-The 50-debt cap is a denial-of-service bound, not a product limit. Fifty debts
-across 1200 months and three scenarios is roughly 180,000 iterations,
-comfortably under 100ms.
+The 20-debt cap is a denial-of-service bound, not a product limit. An earlier
+draft set it at 50 and claimed the work was "comfortably under 100ms"; that
+claim was wrong by roughly 26x. One measured 50-debt `?detail=full` request
+produced a **16.7 MB response body, ~2.6 s of CPU and 215 MB of peak RSS** —
+on an endpoint with no authentication in front of it. Twenty is the cap that
+keeps a single unauthenticated request from being worth sending.
 
-The upper bound on `apr` matches the eventual `numeric(5,2)` column. It is
-written `Decimal("999.99")` rather than a float literal: a bare `999.99` in a
-constraint would be the one float in a specification that bans them.
+The debt count is only half of it. `MAX_SCHEDULE_ROWS` (section 7) bounds the
+other half, since the baseline's term, not the debt count, is what makes a
+detailed payload large.
+
+`MAX_BODY_BYTES` (256 KB, in `main.py`) is the actual request-size cap
+referenced in section 2. `max_length=20` is not one: it runs only after the
+whole body has been buffered and parsed, so a 500 MB array of debts is fully
+materialized before Pydantic gets to count it. An ASGI middleware rejects an
+oversized `content-length` with a 413 before anything downstream reads a byte.
+
+Every money field is bounded above as well as below, at
+`MONEY_MAX = Decimal("99999999.99")`, matching the eventual `numeric(10,2)`
+column the way `apr` matches `numeric(5,2)`. The ceiling is not cosmetic: with
+`ge=0` alone, `{"balance": "1e1000"}` is a well-formed request that passes
+every schema check, reaches `Debt.__post_init__`, and raises
+`decimal.InvalidOperation` out of `to_cents`. That is not an `InvalidDebt`, so
+it escapes the handler as an unhandled 500 — the exact failure section 11's
+first contract test exists to prevent, on an input the test set had missed.
+
+Both ceilings are written `Decimal("...")` rather than as float literals: a
+bare `999.99` in a constraint would be the one float in a specification that
+bans them.
 
 ### On the deliberate validation overlap
 
@@ -287,6 +326,7 @@ class ScenarioOut(BaseModel):
     debt_payoffs: list[DebtPayoffOut]
     monthly_totals: list[MonthlyTotalOut]
     schedule: list[MonthOut] | None     # populated only when detail=full
+    schedule_truncated: bool            # true when months were dropped
 
 class ScenariosOut(BaseModel):
     snowball: ScenarioOut
@@ -310,6 +350,24 @@ class PayoffPlanResponse(BaseModel):
 `start_month` is echoed back. It costs nothing and makes a stored or logged
 response self-describing: a payoff month can be interpreted without the
 original request.
+
+### The schedule is bounded, and says so
+
+`MAX_SCHEDULE_ROWS = 5000` (in `mappers.py`) caps the per-debt rows any one
+scenario's `schedule` may carry — the sum, over months, of `len(month.debts)`.
+The debt cap alone does not bound this payload, because the baseline's term
+does: a minimums-only scenario can run the full 1200-month horizon, so 20
+debts across three scenarios is tens of megabytes of JSON assembled in memory
+before a byte is sent.
+
+Whole months are dropped from the tail, never partial ones, so every month
+that does appear is complete and month 1 is still month 1. `schedule_truncated`
+reports that it happened, and is false both when nothing was dropped and when
+no schedule was requested at all — a client that would otherwise read a short
+schedule as a short plan has to be told the difference. The summary fields are
+never truncated: `months_to_payoff`, `monthly_totals` and every comparison
+delta remain complete regardless, so nothing the AI layer is permitted to
+state depends on how much of the grid survived.
 
 ### Naming: two numbers, one vocabulary
 
@@ -380,6 +438,7 @@ overflow.
 | Money sent as a JSON number | 422 | the `Money` validator |
 | Bad `start_month` format | 422 | field pattern |
 | Duplicate debt ids, negative extra payment | 422 | `InvalidDebt` handler |
+| Body larger than `MAX_BODY_BYTES` | 413 | `BodySizeLimitMiddleware` |
 | Portfolio never pays off | **200** | a normal result body |
 | Anything unhandled | 500 | logged, generic body |
 
@@ -396,8 +455,14 @@ one error parser rather than two:
 ```python
 @app.exception_handler(InvalidDebt)
 async def handle_invalid_debt(request: Request, exc: InvalidDebt) -> JSONResponse:
-    return JSONResponse(422, {"detail": [{"type": "invalid_debt", "msg": str(exc)}]})
+    return JSONResponse(422, {"detail": [
+        {"type": "invalid_debt", "loc": ["body", "debts"], "msg": str(exc)}
+    ]})
 ```
+
+The `loc` is what makes "one error parser" true rather than nearly true:
+FastAPI's own 422 entries always carry one, so an entry without it is a second
+shape the client has to know about.
 
 ## 10. Configuration and deployment
 

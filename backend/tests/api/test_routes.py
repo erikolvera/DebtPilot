@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api.main import allowed_origins, create_app
+from app.api.main import MAX_BODY_BYTES, allowed_origins, create_app
 
 
 @pytest.fixture
@@ -122,13 +122,22 @@ def test_unknown_field_is_a_422(client):
     assert response.status_code == 422
 
 
-def test_too_many_debts_is_a_422(client):
-    many = [
+def many_debts(count: int) -> list[dict]:
+    return [
         {"id": f"d{i}", "name": f"Card {i}", "balance": "100.00",
          "apr": "10.00", "minimum_payment": "25.00"}
-        for i in range(51)
+        for i in range(count)
     ]
-    assert client.post("/v1/payoff-plans", json=portfolio_body(debts=many)).status_code == 422
+
+
+def test_too_many_debts_is_a_422(client):
+    body = portfolio_body(debts=many_debts(21))
+    assert client.post("/v1/payoff-plans", json=body).status_code == 422
+
+
+def test_exactly_twenty_debts_is_accepted(client):
+    body = portfolio_body(debts=many_debts(20))
+    assert client.post("/v1/payoff-plans", json=body).status_code == 200
 
 
 def test_duplicate_debt_ids_are_a_422_from_the_engine(client):
@@ -138,7 +147,11 @@ def test_duplicate_debt_ids_are_a_422_from_the_engine(client):
     duplicated["debts"][1]["id"] = "a"
     response = client.post("/v1/payoff-plans", json=duplicated)
     assert response.status_code == 422
-    assert response.json()["detail"][0]["type"] == "invalid_debt"
+    entry = response.json()["detail"][0]
+    assert entry["type"] == "invalid_debt"
+    # FastAPI's own 422 entries always carry a `loc`. Without one here, a
+    # client written against the framework envelope has two shapes to parse.
+    assert entry["loc"] == ["body", "debts"]
 
 
 def test_never_pays_off_returns_200_not_an_error(client):
@@ -206,3 +219,72 @@ def test_the_baseline_schedule_is_long(client):
     assert len(body["scenarios"]["baseline"]["schedule"]) > len(
         body["scenarios"]["avalanche"]["schedule"]
     )
+
+
+def test_cors_does_not_advertise_credentialed_requests(monkeypatch):
+    # There is no auth and no cookie in this slice, so allow_credentials would
+    # grant nothing today and become a footgun the moment ALLOWED_ORIGINS=*.
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://app.example")
+    client = TestClient(create_app())
+    response = client.get("/health", headers={"Origin": "https://app.example"})
+    assert "access-control-allow-credentials" not in response.headers
+
+
+def test_cors_preflight_allows_only_get_and_post(monkeypatch):
+    monkeypatch.setenv("ALLOWED_ORIGINS", "https://app.example")
+    client = TestClient(create_app())
+    response = client.options(
+        "/v1/payoff-plans",
+        headers={
+            "Origin": "https://app.example",
+            "Access-Control-Request-Method": "DELETE",
+        },
+    )
+    allowed = response.headers.get("access-control-allow-methods", "")
+    assert "DELETE" not in allowed
+
+
+def test_a_body_over_the_size_cap_is_a_413(client):
+    # `max_length=20` on `debts` runs only after the whole body is buffered
+    # and parsed, so it is not a request-size cap. This is.
+    oversized = b'{"padding": "' + b"x" * (MAX_BODY_BYTES + 1) + b'"}'
+    response = client.post(
+        "/v1/payoff-plans",
+        content=oversized,
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 413
+    entry = response.json()["detail"][0]
+    assert entry["type"] == "request_too_large"
+    assert entry["loc"] == ["header", "content-length"]
+
+
+def test_a_body_under_the_size_cap_is_processed_normally(client):
+    response = client.post("/v1/payoff-plans", json=portfolio_body())
+    assert response.status_code == 200
+    assert int(response.request.headers["content-length"]) <= MAX_BODY_BYTES
+
+
+def test_a_request_with_no_content_length_is_not_rejected(client):
+    # A GET carries no content-length at all; the guard must ignore it rather
+    # than treat a missing header as an oversized body.
+    response = client.get("/health")
+    assert "content-length" not in response.request.headers
+    assert response.status_code == 200
+
+
+def test_non_http_scopes_pass_straight_through():
+    # The lifespan scope reaches the middleware too, and it has no headers to
+    # inspect. Entering the context manager is what runs startup and shutdown.
+    with TestClient(create_app()) as client:
+        assert client.get("/health").status_code == 200
+
+
+def test_openapi_types_request_money_as_a_string():
+    # A BeforeValidator does not change the generated schema on its own, so
+    # without json_schema_input_type this advertises `number | string` while
+    # the code rejects numbers — and the frontend's types are generated here.
+    schema = create_app().openapi()["components"]["schemas"]["DebtIn"]
+    balance = schema["properties"]["balance"]
+    assert balance.get("type") == "string", balance
+    assert "anyOf" not in balance

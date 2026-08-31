@@ -61,6 +61,29 @@ def test_apr_above_the_numeric_5_2_ceiling_is_rejected():
         DebtIn(**debt_payload(apr="1000.00"))
 
 
+def test_balance_above_the_numeric_10_2_ceiling_is_rejected():
+    # Unbounded above, "1e1000" is a well-formed Decimal that survives every
+    # schema check and then blows up inside the engine's to_cents as an
+    # unhandled 500. The ceiling is what turns that into a 422.
+    with pytest.raises(ValidationError):
+        DebtIn(**debt_payload(balance="1e1000"))
+
+
+def test_minimum_payment_above_the_numeric_10_2_ceiling_is_rejected():
+    with pytest.raises(ValidationError):
+        DebtIn(**debt_payload(minimum_payment="100000000.00"))
+
+
+def test_money_exactly_at_the_ceiling_is_allowed():
+    debt = DebtIn(**debt_payload(balance="99999999.99"))
+    assert debt.balance == Decimal("99999999.99")
+
+
+def test_extra_payment_above_the_numeric_10_2_ceiling_is_rejected():
+    with pytest.raises(ValidationError):
+        PayoffPlanRequest(**request_payload(extra_monthly_payment="1e1000"))
+
+
 def test_empty_id_is_rejected():
     with pytest.raises(ValidationError):
         DebtIn(**debt_payload(id=""))
@@ -85,18 +108,18 @@ def test_empty_debt_list_is_valid():
     assert PayoffPlanRequest(**request_payload(debts=[])).debts == []
 
 
-def test_more_than_fifty_debts_is_rejected():
+def test_more_than_twenty_debts_is_rejected():
     with pytest.raises(ValidationError):
         PayoffPlanRequest(
-            **request_payload(debts=[debt_payload(id=f"d{i}") for i in range(51)])
+            **request_payload(debts=[debt_payload(id=f"d{i}") for i in range(21)])
         )
 
 
-def test_exactly_fifty_debts_is_allowed():
+def test_exactly_twenty_debts_is_allowed():
     request = PayoffPlanRequest(
-        **request_payload(debts=[debt_payload(id=f"d{i}") for i in range(50)])
+        **request_payload(debts=[debt_payload(id=f"d{i}") for i in range(20)])
     )
-    assert len(request.debts) == 50
+    assert len(request.debts) == 20
 
 
 @pytest.mark.parametrize("bad", ["2026-13", "26-09", "2026-9", "2026-09-14", ""])
@@ -142,6 +165,7 @@ def scenario_payload(strategy="avalanche", **overrides) -> dict:
             }
         ],
         "schedule": None,
+        "schedule_truncated": False,
     }
     payload.update(overrides)
     return payload

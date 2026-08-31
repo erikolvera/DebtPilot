@@ -104,7 +104,10 @@ Interactive docs at `http://127.0.0.1:8000/docs`; health check at `/health`.
 
 `POST /v1/payoff-plans` takes a portfolio and returns all three scenarios plus
 every precomputed comparison. Add `?detail=full` for the per-debt
-month-by-month schedule.
+month-by-month schedule. Detailed responses can be large — a minimums-only
+baseline runs for hundreds of months — so each scenario's schedule is cut off
+past `MAX_SCHEDULE_ROWS` per-debt rows, with `schedule_truncated: true`
+saying so; the summary numbers and comparison deltas are never truncated.
 
 Money is a JSON **string** in both directions. JSON has no decimal type, so
 accepting bare numbers would reintroduce floats at the boundary of a

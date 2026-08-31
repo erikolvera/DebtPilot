@@ -21,6 +21,15 @@ from .schemas import (
 )
 
 
+# The hard ceiling on per-debt rows in one scenario's `detail=full` schedule.
+# The debt cap alone does not bound the payload: a minimums-only baseline can
+# run the full 1200-month horizon, so 20 debts x 1200 months x 3 scenarios is
+# tens of megabytes of JSON built in memory before a byte is sent. Whole
+# months are dropped from the tail, never partial ones, so every month that
+# does appear is complete; `schedule_truncated` tells the client it happened.
+MAX_SCHEDULE_ROWS = 5000
+
+
 def _payoff_month(months_to_payoff: int | None, start_month: str) -> str | None:
     """Calendar month a plan finishes in, or None when it never does.
 
@@ -33,10 +42,28 @@ def _payoff_month(months_to_payoff: int | None, start_month: str) -> str | None:
     return month_label(start_month, months_to_payoff)
 
 
-def _schedule(schedule: Schedule | None, start_month: str) -> list[MonthOut] | None:
-    """The per-debt month-by-month grid, or None when detail was not requested."""
+def _schedule(
+    schedule: Schedule | None, start_month: str
+) -> tuple[list[MonthOut] | None, bool]:
+    """The per-debt month-by-month grid and whether it was truncated.
+
+    `(None, False)` when detail was not requested. Otherwise the leading
+    months whose per-debt rows fit inside MAX_SCHEDULE_ROWS, and a flag that
+    is true exactly when at least one month was dropped.
+    """
     if schedule is None:
-        return None
+        return None, False
+
+    kept = []
+    rows = 0
+    truncated = False
+    for month in schedule.months:
+        rows += len(month.debts)
+        if rows > MAX_SCHEDULE_ROWS:
+            truncated = True
+            break
+        kept.append(month)
+
     return [
         MonthOut(
             month_number=month.index,
@@ -55,13 +82,14 @@ def _schedule(schedule: Schedule | None, start_month: str) -> list[MonthOut] | N
             total_interest=month.total_interest,
             remaining_balance=month.remaining_balance,
         )
-        for month in schedule.months
-    ]
+        for month in kept
+    ], truncated
 
 
 def _scenario(
     summary: PlanSummary, start_month: str, schedule: Schedule | None
 ) -> ScenarioOut:
+    months, truncated = _schedule(schedule, start_month)
     return ScenarioOut(
         strategy=summary.strategy.value,
         outcome=summary.outcome.value,
@@ -89,7 +117,8 @@ def _scenario(
             )
             for total in summary.monthly_totals
         ],
-        schedule=_schedule(schedule, start_month),
+        schedule=months,
+        schedule_truncated=truncated,
     )
 
 

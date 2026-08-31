@@ -32,7 +32,21 @@ def _reject_json_numbers(value: Any) -> Any:
     raise ValueError('money must be a JSON string, e.g. "1234.56"')
 
 
-Money = Annotated[Decimal, BeforeValidator(_reject_json_numbers)]
+# `json_schema_input_type=str` is load-bearing, not decoration. A
+# BeforeValidator does not change the generated JSON schema on its own, so
+# OpenAPI would advertise request-side money as `number | string` while this
+# validator rejects numbers — and the frontend's types are generated from
+# that schema, so the published contract would be a lie the compiler believes.
+Money = Annotated[
+    Decimal, BeforeValidator(_reject_json_numbers, json_schema_input_type=str)
+]
+
+# The ceiling on every money field. Without an upper bound a well-formed
+# request like {"balance": "1e1000"} passes validation, reaches the engine,
+# and raises decimal.InvalidOperation out of `to_cents` — not an InvalidDebt,
+# so it escapes the handler as an unhandled 500. The value matches the
+# eventual numeric(10,2) column exactly, the way `apr` matches numeric(5,2).
+MONEY_MAX = Decimal("99999999.99")
 
 
 class DebtIn(BaseModel):
@@ -40,18 +54,19 @@ class DebtIn(BaseModel):
 
     id: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=120)
-    balance: Money = Field(ge=0)
+    balance: Money = Field(ge=0, le=MONEY_MAX)
     apr: Money = Field(ge=0, le=Decimal("999.99"))
-    minimum_payment: Money = Field(ge=0)
+    minimum_payment: Money = Field(ge=0, le=MONEY_MAX)
 
 
 class PayoffPlanRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # The 50-debt cap is a denial-of-service bound, not a product limit:
-    # 50 debts x 1200 months x 3 scenarios is roughly 180,000 iterations.
-    debts: list[DebtIn] = Field(max_length=50)
-    extra_monthly_payment: Money = Field(ge=0)
+    # The 20-debt cap is a denial-of-service bound, not a product limit:
+    # one measured 50-debt ?detail=full request produced a 16.7 MB body,
+    # ~2.6s of CPU and 215 MB of peak RSS, on an endpoint with no auth.
+    debts: list[DebtIn] = Field(max_length=20)
+    extra_monthly_payment: Money = Field(ge=0, le=MONEY_MAX)
     start_month: str = Field(pattern=MONTH_PATTERN)
 
 
@@ -100,6 +115,10 @@ class ScenarioOut(BaseModel):
     debt_payoffs: list[DebtPayoffOut]
     monthly_totals: list[MonthlyTotalOut]
     schedule: list[MonthOut] | None
+    # True only when `schedule` was requested and months were dropped to stay
+    # under MAX_SCHEDULE_ROWS. A client that would otherwise read a short
+    # schedule as a short plan needs to be told the difference.
+    schedule_truncated: bool
 
 
 class ScenariosOut(BaseModel):

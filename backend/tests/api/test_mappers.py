@@ -159,3 +159,63 @@ def test_empty_portfolio_with_schedules_has_empty_schedule_lists():
     comparison = summarize_schedules(schedules, [])
     response = to_response(comparison, "2026-09", schedules)
     assert response.scenarios.avalanche.schedule == []
+
+
+from app.api.mappers import MAX_SCHEDULE_ROWS
+
+
+def total_rows(schedule) -> int:
+    return sum(len(month.debts) for month in schedule)
+
+
+def test_a_short_schedule_is_not_truncated():
+    schedules = compute_schedules(PORTFOLIO, EXTRA)
+    comparison = summarize_schedules(schedules, PORTFOLIO)
+    response = to_response(comparison, "2026-09", schedules)
+
+    avalanche = response.scenarios.avalanche
+    assert avalanche.schedule_truncated is False
+    assert len(avalanche.schedule) == len(schedules[Strategy.AVALANCHE].months)
+    assert total_rows(avalanche.schedule) <= MAX_SCHEDULE_ROWS
+
+
+def test_no_schedule_at_all_is_not_reported_as_truncated():
+    # `schedule: null` means "detail was not requested", which is not the
+    # same claim as "we dropped some of your months".
+    response = to_response(compute_plans(PORTFOLIO, EXTRA), "2026-09")
+    assert response.scenarios.avalanche.schedule is None
+    assert response.scenarios.avalanche.schedule_truncated is False
+
+
+def test_a_long_schedule_is_truncated_at_the_row_ceiling():
+    # Twenty debts against a minimums-only baseline: 20 rows a month for
+    # hundreds of months is what makes an unbounded detail=full payload a
+    # denial-of-service vector rather than merely a large response.
+    portfolio = [debt(f"d{i}", "9000.00", "22.00", "180.00") for i in range(20)]
+    schedules = compute_schedules(portfolio, Decimal("0.00"))
+    comparison = summarize_schedules(schedules, portfolio)
+    response = to_response(comparison, "2026-09", schedules)
+
+    baseline = response.scenarios.baseline
+    engine_months = schedules[Strategy.MINIMUM_ONLY].months
+    assert total_rows(engine_months) > MAX_SCHEDULE_ROWS
+
+    assert baseline.schedule_truncated is True
+    assert len(baseline.schedule) < len(engine_months)
+    assert total_rows(baseline.schedule) <= MAX_SCHEDULE_ROWS
+
+
+def test_truncation_keeps_whole_months_from_the_start():
+    # Dropping from the tail, never mid-month: every month that survives is
+    # complete, and month 1 is still month 1.
+    portfolio = [debt(f"d{i}", "9000.00", "22.00", "180.00") for i in range(20)]
+    schedules = compute_schedules(portfolio, Decimal("0.00"))
+    comparison = summarize_schedules(schedules, portfolio)
+    response = to_response(comparison, "2026-09", schedules)
+
+    engine_months = schedules[Strategy.MINIMUM_ONLY].months
+    wire_months = response.scenarios.baseline.schedule
+    assert wire_months[0].month_number == 1
+    for wire_month, engine_month in zip(wire_months, engine_months, strict=False):
+        assert len(wire_month.debts) == len(engine_month.debts)
+        assert wire_month.month_number == engine_month.index

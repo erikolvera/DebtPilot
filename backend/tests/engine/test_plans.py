@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from app.engine.minimums import fixed_minimum
+from app.engine.minimums import declining_minimum, fixed_minimum
 from app.engine.models import Debt, Outcome, Strategy
 from app.engine.ordering import snowball_order
 from app.engine.plans import summarize
@@ -186,10 +186,47 @@ def test_schedules_carry_the_per_debt_grid_that_summaries_drop():
     assert first_month.debts[0].interest_charged == Decimal("1.00")
 
 
-def test_summarize_schedules_reproduces_compute_plans_exactly():
+def test_compute_plans_pins_the_fixture_portfolios_numbers():
+    # Value-pinned, not self-comparing. `compute_plans` IS
+    # `summarize_schedules(compute_schedules(...))`, so asserting the two
+    # agree asserts f(g(x)) == f(g(x)) and cannot fail. These are the numbers
+    # the engine actually produces; a change to any of them is a change to
+    # what a user is told, and has to be argued for rather than absorbed.
     debts = [debt("a", "500.00", "5.00", "25.00"), debt("b", "2000.00", "25.00", "50.00")]
-    extra = Decimal("200.00")
-    assert summarize_schedules(compute_schedules(debts, extra), debts) == compute_plans(debts, extra)
+    plans = compute_plans(debts, Decimal("200.00"))
+
+    assert plans.snowball.months_to_payoff == 11
+    assert plans.snowball.total_interest_paid == Decimal("283.98")
+    assert plans.avalanche.months_to_payoff == 10
+    assert plans.avalanche.total_interest_paid == Decimal("227.25")
+    assert plans.baseline.months_to_payoff == 253
+    assert plans.baseline.total_interest_paid == Decimal("6186.55")
+
+
+def test_summarize_schedules_agrees_with_the_pinned_numbers():
+    # The composition still has to be checked, but against fixed values
+    # rather than against itself: this fails if summarize_schedules and
+    # compute_schedules stop composing into what compute_plans promises.
+    debts = [debt("a", "500.00", "5.00", "25.00"), debt("b", "2000.00", "25.00", "50.00")]
+    plans = summarize_schedules(compute_schedules(debts, Decimal("200.00")), debts)
+
+    assert plans.avalanche.months_to_payoff == 10
+    assert plans.avalanche.total_interest_paid == Decimal("227.25")
+    assert plans.baseline.months_to_payoff == 253
+
+
+def test_the_baseline_does_not_roll_over_a_cleared_debts_minimum():
+    # "Do nothing differently" means a freed minimum is spent elsewhere, not
+    # redirected at the next debt. Nothing else pins rollover=False on the
+    # baseline: card a clears in month 2, and reusing its $50 would finish
+    # this portfolio in 16 months instead of 26.
+    debts = [debt("a", "100.00", "0.00", "50.00"), debt("b", "1000.00", "12.00", "100.00")]
+
+    baseline = compute_schedules(debts, ZERO)[Strategy.MINIMUM_ONLY]
+    rolled_over = simulate(debts, ZERO, snowball_order, declining_minimum, rollover=True)
+
+    assert len(rolled_over.months) == 16
+    assert len(baseline.months) == 26
 
 
 def test_baseline_schedule_ignores_the_extra_payment():

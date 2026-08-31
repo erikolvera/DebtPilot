@@ -55,6 +55,12 @@ REJECTED_INPUTS = [
     pytest.param(
         [{"id": "a", "name": "A", "balance": "100.00", "apr": "10.00", "minimum_payment": "-5.00"}],
         "200.00", id="negative-minimum"),
+    # Unbounded above, this is a well-formed Decimal that reaches the engine
+    # and raises decimal.InvalidOperation out of to_cents -- not InvalidDebt,
+    # so it escaped the handler as an unhandled 500.
+    pytest.param(
+        [{"id": "a", "name": "A", "balance": "1e1000", "apr": "10.00", "minimum_payment": "25.00"}],
+        "200.00", id="absurdly-large-balance"),
 ]
 
 
@@ -117,6 +123,23 @@ def test_per_debt_payoff_numbers_survive_the_mapping(client):
         assert wire["name"] == engine_payoff.name
         assert wire["months_to_payoff"] == engine_payoff.payoff_month
         assert wire["total_interest_paid"] == str(engine_payoff.total_interest_paid)
+
+
+def test_monthly_total_money_survives_the_mapping(client):
+    # Without this, swapping remaining_balance and cumulative_interest in the
+    # mapper would pass the whole suite: nothing else compares these values
+    # against the engine, only their count.
+    expected = compute_plans(ENGINE_PORTFOLIO, Decimal("200.00"))
+    payload = client.post("/v1/payoff-plans", json=body(WIRE_PORTFOLIO)).json()
+
+    for wire, engine_total in zip(
+        payload["scenarios"]["avalanche"]["monthly_totals"],
+        expected.avalanche.monthly_totals,
+        strict=True,
+    ):
+        assert wire["month_number"] == engine_total.index
+        assert wire["remaining_balance"] == str(engine_total.remaining_balance)
+        assert wire["cumulative_interest"] == str(engine_total.cumulative_interest)
 
 
 def test_every_schedule_row_survives_the_mapping(client):
