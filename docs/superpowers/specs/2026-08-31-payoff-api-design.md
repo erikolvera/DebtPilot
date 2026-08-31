@@ -155,8 +155,15 @@ backend/app/
 backend/tests/api/
 ```
 
-The route handler validates, calls `compute_plans`, and maps. Nothing else; it
+The route handler validates, calls the engine, and maps. Nothing else; it
 should land near ten lines, which is the right size for plumbing.
+
+On the default path it calls `compute_plans`. On the `detail=full` path it
+calls `compute_schedules` and `summarize_schedules` instead, which run the same
+three scenarios but keep the per-debt grids that `compute_plans` discards.
+Either path simulates three times, never six. Those two functions were added to
+the engine for this purpose: `PlanSummary` carries `monthly_totals` but not the
+per-debt rows, so the detailed response could not otherwise be built.
 
 Route handlers are declared `def`, not `async def`. The engine is CPU-bound
 pure Python, so a plain `def` makes FastAPI run it in a threadpool instead of
