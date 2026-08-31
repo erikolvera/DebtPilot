@@ -1,0 +1,93 @@
+"""The single month-stepping loop.
+
+Snowball, avalanche, and the minimums-only baseline are all this function with
+different seams. Keeping the arithmetic in one place is a correctness property,
+not a style preference: three copies would be three independent homes for a
+rounding bug, and a near-certainty that a fix lands in only two of them.
+"""
+
+from collections.abc import Callable, Mapping, Sequence
+from decimal import Decimal
+
+from .interest import monthly_interest
+from .models import Debt, DebtMonth, Month, Outcome, Schedule, validate_portfolio
+from .money import to_cents
+
+MAX_MONTHS = 1200
+ZERO = Decimal("0.00")
+
+OrderFn = Callable[[Sequence[Debt], Mapping[str, Decimal]], tuple[Debt, ...]]
+MinimumRule = Callable[[Debt, Decimal], Decimal]
+
+
+def _build_month(
+    index: int,
+    active: Sequence[Debt],
+    starting: Mapping[str, Decimal],
+    interest: Mapping[str, Decimal],
+    payments: Mapping[str, Decimal],
+    balances: Mapping[str, Decimal],
+) -> Month:
+    rows = tuple(
+        DebtMonth(
+            debt_id=d.id,
+            starting_balance=starting[d.id],
+            interest_charged=interest[d.id],
+            payment_applied=payments[d.id],
+            ending_balance=balances[d.id],
+        )
+        for d in active
+    )
+    return Month(
+        index=index,
+        debts=rows,
+        total_payment=sum((r.payment_applied for r in rows), ZERO),
+        total_interest=sum((r.interest_charged for r in rows), ZERO),
+        remaining_balance=sum(balances.values(), ZERO),
+    )
+
+
+def simulate(
+    debts: Sequence[Debt],
+    extra_payment: Decimal,
+    order_fn: OrderFn,
+    minimum_rule: MinimumRule,
+    rollover: bool = True,
+) -> Schedule:
+    """Step month by month until every debt clears."""
+    validate_portfolio(debts, extra_payment)
+    extra_payment = to_cents(extra_payment)
+
+    active_debts = [d for d in debts if d.balance > ZERO]
+    if not active_debts:
+        return Schedule(months=(), outcome=Outcome.PAID_OFF)
+
+    balances: dict[str, Decimal] = {d.id: d.balance for d in active_debts}
+    months: list[Month] = []
+
+    for index in range(1, MAX_MONTHS + 1):
+        active = [d for d in active_debts if balances[d.id] > ZERO]
+        if not active:
+            break
+
+        starting = {d.id: balances[d.id] for d in active}
+
+        interest: dict[str, Decimal] = {}
+        for d in active:
+            charge = monthly_interest(balances[d.id], d.apr)
+            interest[d.id] = charge
+            balances[d.id] += charge
+
+        scheduled = {d.id: minimum_rule(d, starting[d.id]) for d in active}
+
+        payments: dict[str, Decimal] = {}
+        for d in active:
+            # Truncate the final payment to what is actually owed, so balances
+            # never go negative and total interest stays honest.
+            pay = min(scheduled[d.id], balances[d.id])
+            payments[d.id] = pay
+            balances[d.id] -= pay
+
+        months.append(_build_month(index, active, starting, interest, payments, balances))
+
+    return Schedule(months=tuple(months), outcome=Outcome.PAID_OFF)
