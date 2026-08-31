@@ -64,6 +64,7 @@ def simulate(
 
     balances: dict[str, Decimal] = {d.id: d.balance for d in active_debts}
     months: list[Month] = []
+    freed_pool = ZERO
 
     for index in range(1, MAX_MONTHS + 1):
         active = [d for d in active_debts if balances[d.id] > ZERO]
@@ -79,14 +80,34 @@ def simulate(
             balances[d.id] += charge
 
         scheduled = {d.id: minimum_rule(d, starting[d.id]) for d in active}
+        required = {d.id: min(scheduled[d.id], balances[d.id]) for d in active}
+
+        # Budget is built from SCHEDULED minimums, not required ones. The gap
+        # between them is the final-payment truncation remainder, and routing
+        # it through `surplus` is what keeps it from silently evaporating.
+        budget = sum(scheduled.values(), ZERO) + extra_payment + freed_pool
 
         payments: dict[str, Decimal] = {}
         for d in active:
-            # Truncate the final payment to what is actually owed, so balances
-            # never go negative and total interest stays honest.
-            pay = min(scheduled[d.id], balances[d.id])
-            payments[d.id] = pay
-            balances[d.id] -= pay
+            payments[d.id] = required[d.id]
+            balances[d.id] -= required[d.id]
+
+        surplus = budget - sum(required.values(), ZERO)
+        if surplus > ZERO:
+            for d in order_fn(active, starting):
+                if surplus <= ZERO:
+                    break
+                pay = min(surplus, balances[d.id])
+                if pay <= ZERO:
+                    continue
+                balances[d.id] -= pay
+                payments[d.id] += pay
+                surplus -= pay
+
+        if rollover:
+            for d in active:
+                if balances[d.id] <= ZERO:
+                    freed_pool += scheduled[d.id]
 
         months.append(_build_month(index, active, starting, interest, payments, balances))
 
