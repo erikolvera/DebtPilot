@@ -100,20 +100,33 @@ export function EscapeChart({ tracks, startMonth, dimmed }: Props) {
                   </svg>
 
                   {figures.paidOff && !clips && figures.months !== null && (
-                    <span
-                      className="absolute top-full mt-1 -translate-x-1/2 whitespace-nowrap"
-                      style={{ left: across(figures.months) }}
-                    >
+                    <>
+                      {/* The dot marks the month, so the dot ALONE is centred on
+                          the point: it is 8px wide, so -translate-x-1/2 moves it
+                          4px and lands true. Centring the dot and its label as
+                          one span — the obvious thing, and what an earlier
+                          version did — shifts the pair by half the LABEL's
+                          width, putting the dot roughly 15% of a lane early and
+                          making the marker disagree with the wedge beneath it.
+                          On a chart whose job is showing when you finish, the
+                          marker was claiming the wrong month. */}
                       <span
                         aria-hidden="true"
-                        className="mr-1 inline-block h-2 w-2 rounded-full align-middle"
-                        style={{ background: track.accent }}
+                        className="absolute top-full mt-1 h-2 w-2 -translate-x-1/2 rounded-full"
+                        style={{ left: across(figures.months), background: track.accent }}
                       />
-                      <span className="tnum text-xs">
+                      {/* The label is right-anchored so it reads up to the dot
+                          and never runs off the right edge.
+                          ponytail: a payoff in the first third of the domain can
+                          push it past the left edge, where it clips. The dot
+                          stays correct, and the dot is the part that makes a
+                          claim; upgrade to a side-aware anchor if that case
+                          shows up in practice. */}
+                      <span
+                        className="tnum absolute top-full mt-1 -translate-x-full whitespace-nowrap pr-3 text-xs"
+                        style={{ left: across(figures.months) }}
+                      >
                         {figures.payoffMonth}
-                        {/* figures.*, never track.scenario.*: reaching past
-                            scenarioFigures() is how the §3.4 suppression gets
-                            bypassed by accident. */}
                         {figures.totalInterestWhole !== null && (
                           <span className="text-ink-soft">
                             {" · "}
@@ -121,7 +134,7 @@ export function EscapeChart({ tracks, startMonth, dimmed }: Props) {
                           </span>
                         )}
                       </span>
-                    </span>
+                    </>
                   )}
 
                   {clips && (
