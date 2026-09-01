@@ -32,8 +32,8 @@ npm run dev
 - JSON money is a string, never a bare JSON number.
 - The LLM is not part of the calculation path. Recommendations are deterministic.
 - Cash flow is income minus non-debt expenses minus debt minimum payments.
-- Normalize weekly income with 52 pay periods and biweekly income with 26,
-  dividing the annual total by 12 before cash-flow calculations.
+- Divide annual salary by 12. Normalize weekly income with 52 pay periods and
+  biweekly income with 26, dividing annual totals by 12 before cash-flow math.
 - A requested extra payment is capped at non-negative available cash flow.
 - A deficit never produces an accelerated payoff recommendation.
 - Snowball, Avalanche, and minimum-only use the same parameterized simulator.

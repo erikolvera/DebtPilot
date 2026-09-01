@@ -16,6 +16,7 @@ from .models import (
 ZERO = Decimal("0.00")
 MONTHS_PER_YEAR = Decimal("12")
 PAY_PERIODS = {
+    IncomeFrequency.SALARY: Decimal("1"),
     IncomeFrequency.MONTHLY: Decimal("12"),
     IncomeFrequency.BIWEEKLY: Decimal("26"),
     IncomeFrequency.WEEKLY: Decimal("52"),

@@ -6,6 +6,7 @@ from enum import Enum
 
 
 class IncomeFrequency(str, Enum):
+    SALARY = "salary"
     MONTHLY = "monthly"
     BIWEEKLY = "biweekly"
     WEEKLY = "weekly"

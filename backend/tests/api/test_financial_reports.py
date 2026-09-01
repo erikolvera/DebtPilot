@@ -168,6 +168,7 @@ def test_report_money_must_stay_a_json_string(client):
 @pytest.mark.parametrize(
     ("amount", "frequency", "monthly"),
     [
+        ("72000.00", "salary", "6000.00"),
         ("5000.00", "monthly", "5000.00"),
         ("2307.69", "biweekly", "5000.00"),
         ("1000.00", "weekly", "4333.33"),

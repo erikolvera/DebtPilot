@@ -16,6 +16,7 @@ const DECIMAL = /^\d+(\.\d{1,2})?$/;
 const MONEY_MAX = 99999999.99;
 const MAX_NAME = 120;
 const FREQUENCIES = [
+  ["salary", "Salary (annual)"],
   ["monthly", "Monthly"],
   ["biweekly", "Biweekly"],
   ["weekly", "Weekly"],
@@ -100,7 +101,7 @@ export function IncomeTable({ incomes, onChange }: Props) {
                 Source
               </th>
               <th scope="col" className="eyebrow w-[30%] py-2 font-normal">
-                Schedule
+                Pay basis
               </th>
               <th scope="col" className="eyebrow w-[22%] py-2 text-right font-normal">
                 Amount
@@ -189,8 +190,8 @@ export function IncomeTable({ incomes, onChange }: Props) {
       )}
 
       <p className="mt-4 text-xs leading-relaxed text-ink-soft">
-        Weekly pay uses 52 checks per year; every-two-weeks pay uses 26. The
-        report divides the annual total by 12 for a monthly average.
+        Annual salary is divided by 12. Weekly pay uses 52 checks per year;
+        biweekly pay uses 26. The report converts each to a monthly average.
       </p>
 
       <button

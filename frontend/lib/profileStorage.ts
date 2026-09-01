@@ -19,6 +19,7 @@ const PROFILE_KEY = "debtpilot.financial-profile.v3";
 const PREVIOUS_PROFILE_KEY = "debtpilot.financial-profile.v2";
 const LEGACY_KEY = "debtpilot.portfolio.v1";
 const INCOME_FREQUENCIES = new Set<IncomeFrequency>([
+  "salary",
   "monthly",
   "biweekly",
   "weekly",

@@ -83,7 +83,7 @@ function namedAmountIsValid(row: { name: string; monthly_amount: string }): bool
   );
 }
 
-const INCOME_FREQUENCIES = new Set(["monthly", "biweekly", "weekly"]);
+const INCOME_FREQUENCIES = new Set(["salary", "monthly", "biweekly", "weekly"]);
 
 function incomeIsValid(income: IncomeDraft): boolean {
   const name = income.name.trim();

@@ -208,7 +208,7 @@ export interface components {
          * IncomeFrequency
          * @enum {string}
          */
-        IncomeFrequency: "monthly" | "biweekly" | "weekly";
+        IncomeFrequency: "salary" | "monthly" | "biweekly" | "weekly";
         /** IncomeIn */
         IncomeIn: {
             /** Id */

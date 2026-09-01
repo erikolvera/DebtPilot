@@ -19,6 +19,7 @@ def amount(value: str) -> Decimal:
 @pytest.mark.parametrize(
     ("frequency", "paycheck", "expected"),
     [
+        (IncomeFrequency.SALARY, "72000.00", "6000.00"),
         (IncomeFrequency.MONTHLY, "5000.00", "5000.00"),
         (IncomeFrequency.BIWEEKLY, "2307.69", "4999.995"),
         (IncomeFrequency.WEEKLY, "1000.00", "4333.333333333333333333333333"),
