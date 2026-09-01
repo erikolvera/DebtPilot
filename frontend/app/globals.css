@@ -1,26 +1,85 @@
 @import "tailwindcss";
 
+/* Light is the base definition; dark redefines only the values. Tailwind v4's
+   `@theme inline` then maps them onto colour utilities, which is what lets a
+   media query change the palette without redeclaring the theme. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --paper: #e8ebf0;
+  --ink: #1b2028;
+  --ink-soft: #59616f;
+  --rule: #c8ceda;
+  --baseline: #7c8497;
+  --snowball: #d98324;
+  --avalanche: #0e7c6b;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #14161c;
+    --ink: #e6e9ef;
+    --ink-soft: #98a1b2;
+    --rule: #2c313c;
+    --baseline: #98a1b2;
+    --snowball: #e89a44;
+    --avalanche: #22a491;
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-rule: var(--rule);
+  --color-baseline: var(--baseline);
+  --color-snowball: var(--snowball);
+  --color-avalanche: var(--avalanche);
+
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+}
+
+html {
+  color-scheme: light dark;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every figure on this page changes while the slider is dragged. With
+   proportional digits the results column shimmers on each frame; with tabular
+   figures only the glyphs change and the layout holds still. */
+.tnum {
+  /* var(--font-plex-mono), not var(--font-mono): the latter is declared inside
+     `@theme inline`, which resolves theme values into utilities rather than
+     guaranteeing the custom property is emitted to :root. next/font puts
+     --font-plex-mono on :root via the html className, so it is certain. */
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.eyebrow {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--avalanche);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
