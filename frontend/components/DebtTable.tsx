@@ -8,8 +8,14 @@ type Props = {
   onChange: (debts: DebtDraft[]) => void;
 };
 
-const CELL = "w-full bg-transparent px-2 py-1.5 text-right tabular-nums " +
-  "font-mono text-sm outline-none focus:bg-ink/5 rounded";
+// Tighter padding and smaller figures below `sm`. The fixed column widths that
+// stop "Visa Signature" truncating on desktop leave the numeric columns ~49-68px
+// at a 360px viewport, where 14px mono plus 16px of padding clipped every one of
+// them mid-value. A clipped NUMBER is worse than a clipped name — "24.9" reads
+// as a different APR than "24.99" — so the numerals give up size before the
+// value gives up digits.
+const CELL = "w-full bg-transparent px-1 py-1.5 text-right tabular-nums " +
+  "font-mono text-xs outline-none focus:bg-ink/5 rounded sm:px-2 sm:text-sm";
 
 export function DebtTable({ debts, onChange }: Props) {
   const update = (id: string, field: keyof DebtDraft, value: string) =>
