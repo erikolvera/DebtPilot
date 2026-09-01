@@ -1,4 +1,15 @@
+"use client";
+
+import { useState } from "react";
+import { DebtTable } from "@/components/DebtTable";
+import { ExtraPayment } from "@/components/ExtraPayment";
+import { seedPortfolio } from "@/lib/seed";
+
+// Temporary shell: mounts the input rail so it can be exercised before the
+// results components exist. Task 12 replaces this with the real page.
 export default function Page() {
+  const [{ debts, extra }, setPortfolio] = useState(seedPortfolio());
+
   return (
     <main className="mx-auto max-w-[1180px] px-6 py-12 lg:px-10">
       <header className="max-w-2xl">
@@ -12,7 +23,16 @@ export default function Page() {
         </p>
       </header>
 
-      <p className="tnum mt-12 text-2xl">$6,120.00 · 24.99% · Sep 2029</p>
+      <div className="mt-12 max-w-2xl">
+        <DebtTable
+          debts={debts}
+          onChange={(next) => setPortfolio((prev) => ({ ...prev, debts: next }))}
+        />
+        <ExtraPayment
+          value={extra}
+          onChange={(next) => setPortfolio((prev) => ({ ...prev, extra: next }))}
+        />
+      </div>
     </main>
   );
 }
