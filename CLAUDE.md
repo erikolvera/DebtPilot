@@ -297,10 +297,15 @@ Payoff plans
 - GET /payoff-plans, GET /payoff-plans/{id} — deferred until persistence exists.
 
 AI guidance
-- POST /payoff-plans/{id}/explain, generates a natural-language
-  explanation and recommendation from the plan's already-computed numbers
-- POST /payoff-plans/{id}/ask, a scoped follow-up question, grounded only
-  in that plan's data
+- POST /v1/payoff-plans/explain — built. Same body as the plan route;
+  recomputes server-side and returns a narrative plus a `source` field.
+  Anonymous, rate limited, and never 5xx for a generation problem.
+- The model writes tokens, not numbers: its output must contain no digits, and
+  every token must exist in that request's presentation dictionary. Figures the
+  engine cannot supply are not offered, so they cannot be stated.
+- User text never enters the prompt; debt names are substituted afterwards.
+- POST /ask — deferred. It accepts arbitrary user text and needs its own
+  design for injection, scoping and conversation state.
 
 ## Project structure
 
@@ -350,5 +355,10 @@ The engine is a framework-free package inside the backend:
 - The application connects to Postgres as `app_user` (`nosuperuser`,
   `nobypassrls`), never as `postgres`, which has `rolbypassrls = true` and
   would ignore every policy while every test still passed.
+- The AI layer receives only pre-formatted strings from
+  `guidance/presentation.py`, never raw engine objects, and never computes. If
+  a sentence needs a number, that number is a field on the engine's result and
+  a token in the presentation dictionary — add it there rather than letting the
+  model derive it.
 - Never hardcode API keys or database URLs. Use environment variables and
   keep a `.env.example` file up to date.

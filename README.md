@@ -177,11 +177,45 @@ tokens: `curl {SUPABASE_URL}/auth/v1/.well-known/jwks.json` should return an EC
 key. Projects still on the legacy shared JWT secret sign with HS256, which this
 code deliberately does not accept.
 
+### Explaining a plan
+
+```
+POST /v1/payoff-plans/explain
+```
+
+Takes the same body as `POST /v1/payoff-plans` and returns
+`{"headline": "...", "body": "...", "source": "model" | "template"}`.
+
+Call it alongside the plan rather than instead of it. The engine answers in
+under a millisecond and a generation call takes seconds, so the client renders
+the plan immediately and fills the prose in when it arrives. An outage costs a
+paragraph, not the plan.
+
+**The narrative never contains a number the engine did not compute.** The
+model returns prose made of `{token}` placeholders and no digits at all; the
+server substitutes values from the comparison. A response containing a digit,
+or a token that does not exist for that request, is rejected — so a wrong
+figure is impossible rather than merely unlikely. Figures the engine cannot
+supply, such as the totals for a portfolio that never pays off, are not
+offered as tokens and therefore cannot be mentioned.
+
+User text never enters the prompt. The model writes `{first_cleared_name}`
+without seeing what the debt is called, so a debt named "Ignore previous
+instructions" has nothing to inject into.
+
+**The response is plain text. Do not render it as HTML.**
+
+With no `GEMINI_API_KEY` set, the endpoint serves a hand-written template —
+correct, deterministic, and the same fallback used in production when Gemini
+is unavailable. Callers are limited to 10 requests per hour per IP, which is a
+speed bump rather than a wall: set a spend limit in the Gemini console.
+
 ## Roadmap
 
 - [x] Debt engine
 - [x] Payoff plan API — stateless `POST /v1/payoff-plans`
 - [x] Debts CRUD with persistence (Supabase Auth, Postgres, row-level security)
 - [ ] Supabase Postgres + auth
-- [ ] AI guidance layer (Gemini, behind a provider interface)
+- [x] AI guidance — `POST /v1/payoff-plans/explain`
+- [ ] AI follow-up questions (`POST /ask`)
 - [ ] Next.js frontend
