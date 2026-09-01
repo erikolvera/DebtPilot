@@ -24,3 +24,9 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Agent tooling. `.agents/` and skills-lock.json are tracked: they pin which
+# skills this repo uses, by content hash, so a checkout gets the same ones.
+# `.claude/` is local machine state -- granted permissions and symlinks into
+# .agents/ that the CLI rebuilds itself.
+.claude/
