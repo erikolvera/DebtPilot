@@ -322,7 +322,11 @@ import type { paths } from "./api-types";
 type PlanPost = paths["/v1/payoff-plans"]["post"];
 type ExplainPost = paths["/v1/payoff-plans/explain"]["post"];
 
-export type PayoffPlanRequest = PlanPost["requestBody"]["content"]["application/json"];
+// NonNullable: openapi-typescript emits `requestBody?:` for some shapes, and
+// indexing an optional type is an error under strict. It is the identity when
+// the property is already required.
+export type PayoffPlanRequest =
+  NonNullable<PlanPost["requestBody"]>["content"]["application/json"];
 export type PayoffPlanResponse = PlanPost["responses"][200]["content"]["application/json"];
 export type ExplainResponse = ExplainPost["responses"][200]["content"]["application/json"];
 
@@ -1357,12 +1361,16 @@ body {
    proportional digits the results column shimmers on each frame; with tabular
    figures only the glyphs change and the layout holds still. */
 .tnum {
-  font-family: var(--font-mono);
+  /* var(--font-plex-mono), not var(--font-mono): the latter is declared inside
+     `@theme inline`, which resolves theme values into utilities rather than
+     guaranteeing the custom property is emitted to :root. next/font puts
+     --font-plex-mono on :root via the html className, so it is certain. */
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
 
 .eyebrow {
-  font-family: var(--font-mono);
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
   font-size: 0.6875rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2557,7 +2565,9 @@ export default function Page() {
             <p className="text-ink-soft">
               {portfolio.debts.length === 0
                 ? "Add a card to see your payoff date."
-                : "Working out your plan…"}
+                : error !== null
+                  ? "No plan yet — the planner didn't answer."
+                  : "Working out your plan…"}
             </p>
           ) : (
             <>
