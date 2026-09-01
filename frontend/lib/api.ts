@@ -12,9 +12,7 @@ export type PayoffPlanResponse = PlanPost["responses"][200]["content"]["applicat
 export type ExplainResponse = ExplainPost["responses"][200]["content"]["application/json"];
 
 export type ScenarioOut = PayoffPlanResponse["scenarios"]["snowball"];
-export type ComparisonOut = PayoffPlanResponse["comparison"];
 export type MonthlyTotalOut = ScenarioOut["monthly_totals"][number];
-export type StrategyKey = keyof PayoffPlanResponse["scenarios"];
 
 /** A row as the user is editing it. Every field is a string; see spec §3.3. */
 export type DebtDraft = {

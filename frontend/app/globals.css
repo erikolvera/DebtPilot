@@ -70,6 +70,15 @@ body {
   color: var(--ink-soft);
 }
 
+/* Validation state must be visible, not only announced. `debtErrors` builds a
+   message for every invalid field, and without this the field looks identical
+   to a valid one — leaving a sighted user with no way to see which amount is
+   holding the plan back. A fill colour on a border is safe here; --snowball is
+   ~2.6:1 on the light ground and must never carry text. */
+[aria-invalid="true"] {
+  box-shadow: inset 0 -2px 0 var(--snowball);
+}
+
 :focus-visible {
   outline: 2px solid var(--avalanche);
   outline-offset: 2px;

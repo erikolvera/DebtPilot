@@ -1,12 +1,10 @@
 import type { DebtDraft } from "./api";
+import { MAX_DEBTS } from "./validate";
 
 export type Portfolio = { debts: DebtDraft[]; extra: string };
 export type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
 const KEY = "debtpilot.portfolio.v1";
-
-/** Mirrors the server's MAX_DEBTS_PER_USER. */
-const MAX_DEBTS = 20;
 
 const FIELDS = ["id", "name", "balance", "apr", "minimum_payment"] as const;
 

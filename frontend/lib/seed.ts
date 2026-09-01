@@ -12,7 +12,7 @@ import type { DebtDraft } from "./api";
  * Ids are literal rather than generated so those recorded figures stay
  * reproducible. Rows the user adds get crypto.randomUUID().
  */
-export const SEED_DEBTS: DebtDraft[] = [
+const SEED_DEBTS: DebtDraft[] = [
   { id: "visa", name: "Visa Signature", balance: "6120.00", apr: "24.99", minimum_payment: "122.40" },
   { id: "store", name: "Store card", balance: "1840.00", apr: "27.99", minimum_payment: "46.00" },
   { id: "credit", name: "Credit union", balance: "3250.00", apr: "14.50", minimum_payment: "65.00" },

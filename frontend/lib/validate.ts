@@ -15,7 +15,8 @@ const DECIMAL = /^\d+(\.\d{1,2})?$/;
 
 const MONEY_MAX = 99999999.99;
 const APR_MAX = 999.99;
-const MAX_DEBTS = 20;
+/** Mirrors the server's MAX_DEBTS_PER_USER. */
+export const MAX_DEBTS = 20;
 const MAX_NAME = 120;
 
 function moneyError(value: string, max: number, label: string): string | undefined {

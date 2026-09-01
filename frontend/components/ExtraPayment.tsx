@@ -9,7 +9,8 @@ type Props = {
 };
 
 export function ExtraPayment({ value, onChange }: Props) {
-  const invalid = extraError(value) !== null;
+  const error = extraError(value);
+  const invalid = error !== null;
   // The one place a money value becomes a number: a range input's value is
   // numeric by nature. It is converted straight back to a fixed-2 string and
   // never used for arithmetic.
@@ -44,6 +45,8 @@ export function ExtraPayment({ value, onChange }: Props) {
         onChange={(event) => onChange(Number(event.target.value).toFixed(2))}
         aria-label="Extra payment each month"
       />
+
+      {error !== null && <p className="mt-2 text-xs text-ink-soft">{error}</p>}
 
       <p className="mt-2 text-xs text-ink-soft">
         On top of every minimum. Drag to see what it buys back.

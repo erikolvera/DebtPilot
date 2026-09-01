@@ -1,9 +1,7 @@
 "use client";
 
 import type { DebtDraft } from "@/lib/api";
-import { debtErrors } from "@/lib/validate";
-
-const MAX_DEBTS = 20;
+import { debtErrors, MAX_DEBTS } from "@/lib/validate";
 
 type Props = {
   debts: DebtDraft[];
@@ -63,6 +61,9 @@ export function DebtTable({ debts, onChange }: Props) {
                       aria-invalid={errors.name !== undefined}
                       placeholder="Card name"
                     />
+                    {errors.name !== undefined && (
+                      <p className="mt-1 text-left text-xs text-ink-soft">{errors.name}</p>
+                    )}
                   </td>
                   <td className="py-1">
                     <input
@@ -78,6 +79,9 @@ export function DebtTable({ debts, onChange }: Props) {
                       aria-invalid={errors.balance !== undefined}
                       placeholder="0.00"
                     />
+                    {errors.balance !== undefined && (
+                      <p className="mt-1 text-right text-xs text-ink-soft">{errors.balance}</p>
+                    )}
                   </td>
                   <td className="py-1">
                     <input
@@ -90,6 +94,9 @@ export function DebtTable({ debts, onChange }: Props) {
                       aria-invalid={errors.apr !== undefined}
                       placeholder="0.00"
                     />
+                    {errors.apr !== undefined && (
+                      <p className="mt-1 text-right text-xs text-ink-soft">{errors.apr}</p>
+                    )}
                   </td>
                   <td className="py-1">
                     <input
@@ -102,6 +109,9 @@ export function DebtTable({ debts, onChange }: Props) {
                       aria-invalid={errors.minimum_payment !== undefined}
                       placeholder="0.00"
                     />
+                    {errors.minimum_payment !== undefined && (
+                      <p className="mt-1 text-right text-xs text-ink-soft">{errors.minimum_payment}</p>
+                    )}
                   </td>
                   <td className="py-1 pl-1">
                     <button

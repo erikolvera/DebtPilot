@@ -77,6 +77,11 @@ describe("isSendable", () => {
     expect(isSendable(many, "200.00")).toBe(false);
   });
 
+  test("is true at exactly the 20-debt cap", () => {
+    const twenty = Array.from({ length: 20 }, (_, i) => ({ ...OK, id: String(i) }));
+    expect(isSendable(twenty, "200.00")).toBe(true);
+  });
+
   test("is true for a valid portfolio", () => {
     expect(isSendable([OK], "200.00")).toBe(true);
   });

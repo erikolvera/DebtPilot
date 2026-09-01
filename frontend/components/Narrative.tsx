@@ -12,11 +12,9 @@ import {
 type Props = {
   debts: DebtDraft[];
   extra: string;
-  /** True once a plan has arrived, so there is something worth explaining. */
-  ready: boolean;
 };
 
-export function Narrative({ debts, extra, ready }: Props) {
+export function Narrative({ debts, extra }: Props) {
   const [result, setResult] = useState<ExplainResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -61,10 +59,10 @@ export function Narrative({ debts, extra, ready }: Props) {
   // minute of dragging, and would describe a portfolio the user had already
   // moved past — generation takes seconds.
   useEffect(() => {
-    if (!ready || askedOnce.current) return;
+    if (askedOnce.current) return;
     askedOnce.current = true;
     return ask();
-  }, [ready, ask]);
+  }, [ask]);
 
   return (
     <section aria-labelledby="narrative-heading" className="mt-14 max-w-prose">
@@ -101,16 +99,14 @@ export function Narrative({ debts, extra, ready }: Props) {
         </p>
       ) : null}
 
-      {ready && (
-        <button
-          type="button"
-          onClick={ask}
-          disabled={loading}
-          className="mt-5 rounded border border-rule px-3 py-1.5 text-sm hover:bg-ink/5 disabled:opacity-40"
-        >
-          {result === null ? "Explain this plan" : "Explain again"}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={ask}
+        disabled={loading}
+        className="mt-5 rounded border border-rule px-3 py-1.5 text-sm hover:bg-ink/5 disabled:opacity-40"
+      >
+        {result === null ? "Explain this plan" : "Explain again"}
+      </button>
     </section>
   );
 }

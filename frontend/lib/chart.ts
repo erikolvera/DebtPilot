@@ -3,9 +3,15 @@ import type { MonthlyTotalOut, ScenarioOut } from "./api";
 /**
  * Geometry only.
  *
- * `Number()` appears throughout this file and nowhere else outside it. Spec
- * §3.2 permits it for SVG coordinates: these values become pixel positions, not
- * figures on the screen. Nothing computed here is ever rendered as text.
+ * `Number()` is used freely here because these values become SVG pixel
+ * coordinates. That is one of four sanctioned non-money uses in the app — the
+ * others are a bounds comparison in `validate.ts`, a month-array index in
+ * `format.ts`, and the range-slider round-trip in `ExtraPayment.tsx`. What the
+ * rule actually forbids is converting a MONEY value anywhere, because the
+ * backend's contract is a decimal string end to end.
+ *
+ * `yearTicks` is the one function here that produces text rather than
+ * geometry; a four-digit year is exact in a double, so it is safe.
  */
 
 /** Used when no scenario pays off, so there is no finite anchor for the axis. */

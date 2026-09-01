@@ -90,7 +90,9 @@ export default function Page() {
                 ? "Add a card to see your payoff date."
                 : error !== null
                   ? "No plan yet — the planner didn't answer."
-                  : "Working out your plan…"}
+                  : pending
+                    ? "Working out your plan…"
+                    : "Check the highlighted amounts above — one of them isn't a number the planner can use."}
             </p>
           ) : (
             <>
@@ -134,7 +136,6 @@ export default function Page() {
               <Narrative
                 debts={portfolio.debts}
                 extra={portfolio.extra}
-                ready={plan !== null}
               />
             </>
           )}

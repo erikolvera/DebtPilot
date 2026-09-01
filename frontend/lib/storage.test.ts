@@ -50,6 +50,16 @@ describe("loadPortfolio", () => {
     expect(loadPortfolio(stub(JSON.stringify({ debts: many, extra: "0.00" })), FALLBACK)).toEqual(FALLBACK);
   });
 
+  test("accepts a stored portfolio at exactly the 20-debt cap", () => {
+    // Pins the boundary direction: `>=` instead of `>` would discard the
+    // user's saved portfolio on every reload, with this suite still green.
+    const twenty = Array.from({ length: 20 }, (_, i) => ({
+      id: String(i), name: "A", balance: "10.00", apr: "1.00", minimum_payment: "2.00",
+    }));
+    const saved = { debts: twenty, extra: "0.00" };
+    expect(loadPortfolio(stub(JSON.stringify(saved)), FALLBACK)).toEqual(saved);
+  });
+
   test("returns the fallback when storage itself throws", () => {
     // Safari in private mode throws on access rather than returning null.
     const hostile: StorageLike = {
