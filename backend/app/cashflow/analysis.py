@@ -10,9 +10,23 @@ from .models import (
     CashFlowStatus,
     CashFlowSummary,
     DebtPaymentAllocation,
+    IncomeFrequency,
 )
 
 ZERO = Decimal("0.00")
+MONTHS_PER_YEAR = Decimal("12")
+PAY_PERIODS = {
+    IncomeFrequency.MONTHLY: Decimal("12"),
+    IncomeFrequency.BIWEEKLY: Decimal("26"),
+    IncomeFrequency.WEEKLY: Decimal("52"),
+}
+
+
+def monthly_income_amount(amount: Decimal, frequency: IncomeFrequency) -> Decimal:
+    """Convert one paycheck amount to its monthly equivalent."""
+    if amount < ZERO:
+        raise InvalidCashFlow("income may not be negative")
+    return amount * PAY_PERIODS[frequency] / MONTHS_PER_YEAR
 
 
 def analyze_cash_flow(

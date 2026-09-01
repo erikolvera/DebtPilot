@@ -2,6 +2,7 @@ import type {
   DebtType,
   ExpenseDraft,
   FinancialDebtDraft,
+  IncomeFrequency,
   IncomeDraft,
 } from "./api";
 
@@ -14,8 +15,14 @@ export type FinancialProfile = {
   extra: string;
 };
 
-const PROFILE_KEY = "debtpilot.financial-profile.v2";
+const PROFILE_KEY = "debtpilot.financial-profile.v3";
+const PREVIOUS_PROFILE_KEY = "debtpilot.financial-profile.v2";
 const LEGACY_KEY = "debtpilot.portfolio.v1";
+const INCOME_FREQUENCIES = new Set<IncomeFrequency>([
+  "monthly",
+  "biweekly",
+  "weekly",
+]);
 const DEBT_TYPES = new Set<DebtType>([
   "credit_card",
   "auto_loan",
@@ -44,7 +51,10 @@ function hasStrings(value: unknown, fields: string[]): value is Record<string, s
 }
 
 function isIncome(value: unknown): value is IncomeDraft {
-  return hasStrings(value, ["id", "name", "monthly_amount"]);
+  return (
+    hasStrings(value, ["id", "name", "amount", "frequency"]) &&
+    INCOME_FREQUENCIES.has(value.frequency as IncomeFrequency)
+  );
 }
 
 function isExpense(value: unknown): value is ExpenseDraft {
@@ -98,6 +108,42 @@ function migrateLegacy(value: unknown): FinancialProfile | null {
   };
 }
 
+function migratePreviousProfile(value: unknown): FinancialProfile | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.extra !== "string" ||
+    !Array.isArray(record.incomes) ||
+    record.incomes.length > 50 ||
+    !Array.isArray(record.expenses) ||
+    record.expenses.length > 100 ||
+    !record.expenses.every(isExpense) ||
+    !Array.isArray(record.debts) ||
+    record.debts.length > 20 ||
+    !record.debts.every(isDebt)
+  ) {
+    return null;
+  }
+
+  const incomes = record.incomes.map((value): IncomeDraft | null => {
+    if (!hasStrings(value, ["id", "name", "monthly_amount"])) return null;
+    return {
+      id: value.id,
+      name: value.name,
+      amount: value.monthly_amount,
+      frequency: "monthly",
+    };
+  });
+  if (incomes.some((income) => income === null)) return null;
+
+  return {
+    incomes: incomes as IncomeDraft[],
+    expenses: record.expenses,
+    debts: record.debts,
+    extra: record.extra,
+  };
+}
+
 export function loadFinancialProfile(
   storage: StorageLike | null,
   fallback: FinancialProfile,
@@ -108,6 +154,10 @@ export function loadFinancialProfile(
     if (current) {
       const parsed: unknown = JSON.parse(current);
       return isProfile(parsed) ? parsed : fallback;
+    }
+    const previous = storage.getItem(PREVIOUS_PROFILE_KEY);
+    if (previous) {
+      return migratePreviousProfile(JSON.parse(previous)) ?? fallback;
     }
     const legacy = storage.getItem(LEGACY_KEY);
     if (!legacy) return fallback;

@@ -12,7 +12,7 @@ def client() -> TestClient:
 def report_body(**overrides) -> dict:
     body = {
         "incomes": [
-            {"id": "pay", "name": "Take-home pay", "monthly_amount": "5000.00"}
+            {"id": "pay", "name": "Take-home pay", "amount": "5000.00", "frequency": "monthly"}
         ],
         "expenses": [
             {
@@ -89,7 +89,7 @@ def test_deficit_reports_shortfall_and_withholds_a_fake_strategy(client):
         "/v1/financial-reports",
         json=report_body(
             incomes=[
-                {"id": "pay", "name": "Pay", "monthly_amount": "1000.00"}
+                {"id": "pay", "name": "Pay", "amount": "1000.00", "frequency": "monthly"}
             ],
             expenses=[
                 {
@@ -114,7 +114,7 @@ def test_break_even_keeps_a_zero_extra_plan_and_protects_minimums(client):
         "/v1/financial-reports",
         json=report_body(
             incomes=[
-                {"id": "pay", "name": "Pay", "monthly_amount": "3100.00"}
+                {"id": "pay", "name": "Pay", "amount": "3100.00", "frequency": "monthly"}
             ],
             requested_extra_monthly_payment="0.00",
         ),
@@ -160,9 +160,43 @@ def test_duplicate_row_ids_are_rejected(client, collection):
 
 def test_report_money_must_stay_a_json_string(client):
     body = report_body()
-    body["incomes"][0]["monthly_amount"] = 5000
+    body["incomes"][0]["amount"] = 5000
     response = client.post("/v1/financial-reports", json=body)
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("amount", "frequency", "monthly"),
+    [
+        ("5000.00", "monthly", "5000.00"),
+        ("2307.69", "biweekly", "5000.00"),
+        ("1000.00", "weekly", "4333.33"),
+    ],
+)
+def test_income_frequency_is_normalized_before_cash_flow(
+    client, amount, frequency, monthly
+):
+    response = client.post(
+        "/v1/financial-reports",
+        json=report_body(
+            incomes=[
+                {
+                    "id": "pay",
+                    "name": "Paycheck",
+                    "amount": amount,
+                    "frequency": frequency,
+                }
+            ]
+        ),
+    )
+    assert response.status_code == 200
+    assert response.json()["cash_flow"]["total_monthly_income"] == monthly
+
+
+def test_unknown_income_frequency_is_rejected(client):
+    body = report_body()
+    body["incomes"][0]["frequency"] = "sometimes"
+    assert client.post("/v1/financial-reports", json=body).status_code == 422
 
 
 def test_report_rejects_unknown_expense_categories(client):

@@ -4,14 +4,39 @@ import pytest
 
 from app.cashflow import (
     CashFlowStatus,
+    IncomeFrequency,
     InvalidCashFlow,
     allocate_extra_payment,
     analyze_cash_flow,
+    monthly_income_amount,
 )
 
 
 def amount(value: str) -> Decimal:
     return Decimal(value)
+
+
+@pytest.mark.parametrize(
+    ("frequency", "paycheck", "expected"),
+    [
+        (IncomeFrequency.MONTHLY, "5000.00", "5000.00"),
+        (IncomeFrequency.BIWEEKLY, "2307.69", "4999.995"),
+        (IncomeFrequency.WEEKLY, "1000.00", "4333.333333333333333333333333"),
+    ],
+)
+def test_pay_frequency_converts_to_a_monthly_equivalent(
+    frequency, paycheck, expected
+):
+    assert monthly_income_amount(amount(paycheck), frequency) == amount(expected)
+
+
+def test_normalized_income_is_rounded_once_in_the_monthly_summary():
+    result = analyze_cash_flow(
+        [monthly_income_amount(amount("2307.69"), IncomeFrequency.BIWEEKLY)],
+        [],
+        [],
+    )
+    assert result.total_monthly_income == amount("5000.00")
 
 
 def test_surplus_is_income_less_expenses_and_minimums():
@@ -76,6 +101,12 @@ def test_requested_extra_is_capped_when_unaffordable():
         (
             lambda: analyze_cash_flow([], [], [Decimal("-1")]),
             "minimum debt payments",
+        ),
+        (
+            lambda: monthly_income_amount(
+                Decimal("-1"), IncomeFrequency.WEEKLY
+            ),
+            "income",
         ),
         (
             lambda: allocate_extra_payment(

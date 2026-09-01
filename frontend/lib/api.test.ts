@@ -10,7 +10,7 @@ import {
 } from "./api";
 
 const INCOMES: IncomeDraft[] = [
-  { id: "pay", name: "  Take-home pay  ", monthly_amount: "5000.00" },
+  { id: "pay", name: "  Take-home pay  ", amount: "2307.69", frequency: "biweekly" },
 ];
 const EXPENSES: ExpenseDraft[] = [
   { id: "rent", name: "  Rent  ", category: "housing", monthly_amount: "1500.00" },
@@ -41,7 +41,8 @@ test("the financial report request keeps every money value as a string", () => {
   );
   const wire = JSON.parse(JSON.stringify(body));
 
-  expect(wire.incomes[0].monthly_amount).toBe("5000.00");
+  expect(wire.incomes[0].amount).toBe("2307.69");
+  expect(wire.incomes[0].frequency).toBe("biweekly");
   expect(wire.expenses[0].monthly_amount).toBe("1500.00");
   expect(wire.debts[0].balance).toBe("6120.00");
   expect(wire.requested_extra_monthly_payment).toBe("600.00");

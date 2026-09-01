@@ -12,6 +12,8 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
+from app.cashflow import IncomeFrequency
+
 from .dates import MONTH_PATTERN
 
 DebtType = Literal[
@@ -166,7 +168,8 @@ class IncomeIn(BaseModel):
 
     id: str = Field(min_length=1, max_length=64)
     name: NonBlankName
-    monthly_amount: Money = Field(ge=0, le=MONEY_MAX)
+    amount: Money = Field(ge=0, le=MONEY_MAX)
+    frequency: IncomeFrequency = IncomeFrequency.MONTHLY
 
 
 class ExpenseIn(BaseModel):

@@ -204,14 +204,21 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * IncomeFrequency
+         * @enum {string}
+         */
+        IncomeFrequency: "monthly" | "biweekly" | "weekly";
         /** IncomeIn */
         IncomeIn: {
             /** Id */
             id: string;
             /** Name */
             name: string;
-            /** Monthly Amount */
-            monthly_amount: string;
+            /** Amount */
+            amount: string;
+            /** @default monthly */
+            frequency: components["schemas"]["IncomeFrequency"];
         };
         /** MonthlyTotalOut */
         MonthlyTotalOut: {

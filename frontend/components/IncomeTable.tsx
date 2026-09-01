@@ -8,13 +8,18 @@ type Props = {
   onChange: (incomes: IncomeDraft[]) => void;
 };
 
-type IncomeErrors = Partial<Record<"name" | "monthly_amount", string>>;
+type IncomeErrors = Partial<Record<"name" | "amount" | "frequency", string>>;
 
 export const MAX_INCOMES = 50;
 
 const DECIMAL = /^\d+(\.\d{1,2})?$/;
 const MONEY_MAX = 99999999.99;
 const MAX_NAME = 120;
+const FREQUENCIES = [
+  ["monthly", "Monthly"],
+  ["biweekly", "Biweekly"],
+  ["weekly", "Weekly"],
+] as const;
 
 function incomeErrors(income: IncomeDraft): IncomeErrors {
   const errors: IncomeErrors = {};
@@ -23,10 +28,14 @@ function incomeErrors(income: IncomeDraft): IncomeErrors {
   if (name.length === 0) errors.name = "Give this income source a name";
   else if (name.length > MAX_NAME) errors.name = "Name is too long";
 
-  if (!DECIMAL.test(income.monthly_amount)) {
-    errors.monthly_amount = "Monthly amount must be a plain amount, like 1200.50";
-  } else if (Number(income.monthly_amount) > MONEY_MAX) {
-    errors.monthly_amount = "Monthly amount is too large";
+  if (!FREQUENCIES.some(([frequency]) => frequency === income.frequency)) {
+    errors.frequency = "Choose how often you are paid";
+  }
+
+  if (!DECIMAL.test(income.amount)) {
+    errors.amount = "Pay amount must be a plain amount, like 1200.50";
+  } else if (Number(income.amount) > MONEY_MAX) {
+    errors.amount = "Pay amount is too large";
   }
 
   return errors;
@@ -51,7 +60,7 @@ export function IncomeTable({ incomes, onChange }: Props) {
     if (incomes.length >= MAX_INCOMES) return;
     const id = crypto.randomUUID();
     focusId.current = id;
-    onChange([...incomes, { id, name: "", monthly_amount: "" }]);
+    onChange([...incomes, { id, name: "", amount: "", frequency: "monthly" }]);
   };
 
   const problems = incomes.flatMap((income, index) => {
@@ -87,11 +96,14 @@ export function IncomeTable({ incomes, onChange }: Props) {
           </caption>
           <thead>
             <tr className="border-b border-rule text-left">
-              <th scope="col" className="eyebrow w-[62%] py-2 font-normal">
+              <th scope="col" className="eyebrow w-[42%] py-2 font-normal">
                 Source
               </th>
-              <th scope="col" className="eyebrow w-[30%] py-2 text-right font-normal">
-                Monthly
+              <th scope="col" className="eyebrow w-[30%] py-2 font-normal">
+                Schedule
+              </th>
+              <th scope="col" className="eyebrow w-[22%] py-2 text-right font-normal">
+                Amount
               </th>
               <th scope="col" className="sr-only">
                 Remove
@@ -121,16 +133,30 @@ export function IncomeTable({ incomes, onChange }: Props) {
                     />
                   </th>
                   <td className="py-1">
+                    <select
+                      className="w-full rounded-lg bg-transparent px-1 py-2 text-xs outline-none hover:bg-primary/5 focus:bg-primary/5 sm:px-2 sm:text-sm"
+                      value={income.frequency}
+                      onChange={(event) => update(income.id, "frequency", event.target.value)}
+                      aria-label={`${label} — pay frequency`}
+                      aria-invalid={errors.frequency !== undefined}
+                      aria-describedby={errors.frequency ? `income-${index}-frequency-error` : undefined}
+                    >
+                      {FREQUENCIES.map(([value, frequencyLabel]) => (
+                        <option key={value} value={value}>{frequencyLabel}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="py-1">
                     <input
                       className="w-full rounded-lg bg-transparent px-1 py-2 text-right font-mono text-xs tabular-nums outline-none hover:bg-primary/5 focus:bg-primary/5 sm:px-2 sm:text-sm"
                       type="text"
                       inputMode="decimal"
-                      value={income.monthly_amount}
-                      onChange={(event) => update(income.id, "monthly_amount", event.target.value)}
-                      aria-label={`${label} — monthly amount`}
-                      aria-invalid={errors.monthly_amount !== undefined}
+                      value={income.amount}
+                      onChange={(event) => update(income.id, "amount", event.target.value)}
+                      aria-label={`${label} — pay amount`}
+                      aria-invalid={errors.amount !== undefined}
                       aria-describedby={
-                        errors.monthly_amount ? `income-${index}-monthly_amount-error` : undefined
+                        errors.amount ? `income-${index}-amount-error` : undefined
                       }
                       placeholder="0.00"
                     />
@@ -161,6 +187,11 @@ export function IncomeTable({ incomes, onChange }: Props) {
           ))}
         </ul>
       )}
+
+      <p className="mt-4 text-xs leading-relaxed text-ink-soft">
+        Weekly pay uses 52 checks per year; every-two-weeks pay uses 26. The
+        report divides the annual total by 12 for a monthly average.
+      </p>
 
       <button
         type="button"

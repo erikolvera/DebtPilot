@@ -8,6 +8,7 @@ from app.cashflow import (
     CashFlowStatus,
     allocate_extra_payment,
     analyze_cash_flow,
+    monthly_income_amount,
 )
 from app.engine import Debt, compute_plans
 from app.engine.money import to_cents
@@ -124,7 +125,7 @@ def create_financial_report(
         for row in request.debts
     ]
     cash_flow = analyze_cash_flow(
-        [row.monthly_amount for row in request.incomes],
+        [monthly_income_amount(row.amount, row.frequency) for row in request.incomes],
         [row.monthly_amount for row in request.expenses],
         [debt.minimum_payment for debt in debts],
     )

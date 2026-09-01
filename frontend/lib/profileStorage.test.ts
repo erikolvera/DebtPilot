@@ -20,7 +20,7 @@ const FALLBACK = seedFinancialProfile();
 test("a complete financial profile round-trips", () => {
   const storage = stub();
   const saved: FinancialProfile = {
-    incomes: [{ id: "pay", name: "Pay", monthly_amount: "1000.00" }],
+    incomes: [{ id: "pay", name: "Pay", amount: "461.54", frequency: "biweekly" }],
     expenses: [
       { id: "rent", name: "Rent", category: "housing", monthly_amount: "500.00" },
     ],
@@ -38,6 +38,22 @@ test("a complete financial profile round-trips", () => {
   };
   saveFinancialProfile(storage, saved);
   expect(loadFinancialProfile(storage, FALLBACK)).toEqual(saved);
+});
+
+test("a v2 monthly profile migrates to an explicit monthly frequency", () => {
+  const previous = {
+    incomes: [{ id: "pay", name: "Pay", monthly_amount: "1000.00" }],
+    expenses: [],
+    debts: [],
+    extra: "0.00",
+  };
+  const loaded = loadFinancialProfile(
+    stub({ "debtpilot.financial-profile.v2": JSON.stringify(previous) }),
+    FALLBACK,
+  );
+  expect(loaded.incomes).toEqual([
+    { id: "pay", name: "Pay", amount: "1000.00", frequency: "monthly" },
+  ]);
 });
 
 test("a legacy debt portfolio migrates without inventing income or expenses", () => {
@@ -60,13 +76,13 @@ describe("invalid or unavailable storage", () => {
   test("falls back for malformed and unknown shapes", () => {
     expect(
       loadFinancialProfile(
-        stub({ "debtpilot.financial-profile.v2": "not json" }),
+        stub({ "debtpilot.financial-profile.v3": "not json" }),
         FALLBACK,
       ),
     ).toEqual(FALLBACK);
     expect(
       loadFinancialProfile(
-        stub({ "debtpilot.financial-profile.v2": JSON.stringify({ extra: "0.00" }) }),
+        stub({ "debtpilot.financial-profile.v3": JSON.stringify({ extra: "0.00" }) }),
         FALLBACK,
       ),
     ).toEqual(FALLBACK);

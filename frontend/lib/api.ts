@@ -25,7 +25,13 @@ export type DebtDraft = {
 
 export type DebtType = NonNullable<FinancialReportRequest["debts"][number]["type"]>;
 export type FinancialDebtDraft = DebtDraft & { type: DebtType };
-export type IncomeDraft = { id: string; name: string; monthly_amount: string };
+export type IncomeFrequency = NonNullable<FinancialReportRequest["incomes"][number]["frequency"]>;
+export type IncomeDraft = {
+  id: string;
+  name: string;
+  amount: string;
+  frequency: IncomeFrequency;
+};
 export type ExpenseDraft = {
   id: string;
   name: string;

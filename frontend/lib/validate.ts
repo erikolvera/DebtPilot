@@ -83,6 +83,18 @@ function namedAmountIsValid(row: { name: string; monthly_amount: string }): bool
   );
 }
 
+const INCOME_FREQUENCIES = new Set(["monthly", "biweekly", "weekly"]);
+
+function incomeIsValid(income: IncomeDraft): boolean {
+  const name = income.name.trim();
+  return (
+    name.length > 0 &&
+    name.length <= MAX_NAME &&
+    moneyError(income.amount, MONEY_MAX, "Amount") === undefined &&
+    INCOME_FREQUENCIES.has(income.frequency)
+  );
+}
+
 function idsAreUnique(rows: Array<{ id: string }>): boolean {
   return new Set(rows.map((row) => row.id)).size === rows.length;
 }
@@ -101,7 +113,7 @@ export function isFinancialReportSendable(
     return false;
   }
   return (
-    incomes.every(namedAmountIsValid) &&
+    incomes.every(incomeIsValid) &&
     expenses.every(
       (expense) =>
         namedAmountIsValid(expense) && EXPENSE_CATEGORIES.has(expense.category),

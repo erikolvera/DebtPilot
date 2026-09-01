@@ -14,7 +14,7 @@ budget supports.
 
 ## Features
 
-- Multiple take-home and recurring income sources.
+- Monthly, biweekly, and weekly take-home or recurring income sources.
 - Categorized monthly expenses.
 - Credit cards, auto loans, personal loans, student loans, medical debt, and
   other debts.
@@ -81,6 +81,8 @@ npm run gen:api
 ## Calculation assumptions
 
 - Interest accrues monthly before payment.
+- Weekly income is annualized over 52 pay periods and biweekly income over 26,
+  then divided by 12 to produce the monthly cash-flow average.
 - Snowball targets the smallest balance; Avalanche targets the highest APR.
 - Strategy payments keep the initial total minimum-payment budget and roll a
   cleared debt's payment into the next debt.

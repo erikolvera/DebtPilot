@@ -13,8 +13,8 @@ const SEED_DEBTS: FinancialDebtDraft[] = [
 export const EXTRA_SLIDER_MAX = 1000;
 
 const SEED_INCOMES: IncomeDraft[] = [
-  { id: "paycheck", name: "Take-home pay", monthly_amount: "5000.00" },
-  { id: "recurring", name: "Recurring side income", monthly_amount: "300.00" },
+  { id: "paycheck", name: "Take-home paycheck", amount: "2307.69", frequency: "biweekly" },
+  { id: "recurring", name: "Recurring side income", amount: "300.00", frequency: "monthly" },
 ];
 
 const SEED_EXPENSES: ExpenseDraft[] = [
