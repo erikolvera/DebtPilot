@@ -16,6 +16,7 @@ from app.engine import InvalidDebt
 
 from .repositories.debts import DebtLimitReached
 from .routers import debts as debts_router
+from .routers import explain as explain_router
 from .routers import payoff_plans
 
 DEFAULT_ORIGIN = "http://localhost:3000"
@@ -127,6 +128,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(DebtLimitReached, handle_debt_limit)
     app.include_router(payoff_plans.router, prefix="/v1")
     app.include_router(debts_router.router, prefix="/v1")
+    app.include_router(explain_router.router, prefix="/v1")
     return app
 
 

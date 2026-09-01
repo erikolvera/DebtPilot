@@ -8,6 +8,10 @@ dependencies = [
   "sqlalchemy>=2.0",
   "psycopg[binary]>=3.2",
   "pyjwt[crypto]>=2.9",
+  # Upper bound deliberate: this SDK is called on the one path no test
+  # exercises live, and a 2.x rename would surface as a silent permanent
+  # fallback rather than a failure.
+  "google-genai>=1.0,<2",
 ]
 
 [project.optional-dependencies]
@@ -32,4 +36,6 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
-exclude_lines = ["if TYPE_CHECKING:"]
+# A Protocol declares a shape and has no runtime behaviour: its method
+# bodies are `...` and are never executed by anything.
+exclude_lines = ["if TYPE_CHECKING:", "class \\w+\\(Protocol\\):"]

@@ -209,6 +209,18 @@ Everything else is accepted and handled:
 - A $0.01 balance accrues interest that quantizes to `0.00`, so there is no
   immortal fractional debt. This falls out of quantizing at every step.
 
+**Avalanche's optimality is a continuous-model claim.** Avalanche minimizes
+total interest with exact arithmetic, but the engine quantizes every accrual
+to cents, and each rounding can move the true figure either way. When two
+debts' APRs are close enough that the ordering advantage is worth less than
+the accumulated rounding — 0.47% against 0.48% is enough — snowball can come
+out a couple of cents ahead. That is rounding settling a tie the rates left
+open, not a broken ordering, and any test asserting the property must bound
+its tolerance by the number of accruals (months x debts) rather than by a
+flat penny. User-facing copy is unaffected: the figures are already labelled
+estimates, and a two-cent inversion on a seven-thousand-dollar payoff is not
+a recommendation anyone would act on differently.
+
 **Ordering must be total, not merely stable.** Avalanche sorts by highest
 APR, then smallest balance, then `id`. Snowball sorts by smallest balance,
 then highest APR, then `id`. The trailing `id` tiebreak is not pedantry:
@@ -297,10 +309,19 @@ Payoff plans
 - GET /payoff-plans, GET /payoff-plans/{id} — deferred until persistence exists.
 
 AI guidance
-- POST /payoff-plans/{id}/explain, generates a natural-language
-  explanation and recommendation from the plan's already-computed numbers
-- POST /payoff-plans/{id}/ask, a scoped follow-up question, grounded only
-  in that plan's data
+- POST /v1/payoff-plans/explain — built. Same body as the plan route;
+  recomputes server-side and returns a narrative plus a `source` field.
+  Anonymous, rate limited, and never 5xx for a generation problem.
+- The model writes tokens, not numbers: its output must contain no numeric
+  character in any script and no spelled-out cardinal ("seven", "a dozen"),
+  and every token must exist in that request's presentation dictionary.
+  Figures the engine cannot supply are not offered, so they cannot be stated.
+- The guarantee is provenance, not attribution. Every number came from the
+  engine; nothing forces the model to pair the right number with the right
+  claim. User-facing copy must not promise more than that.
+- User text never enters the prompt; debt names are substituted afterwards.
+- POST /ask — deferred. It accepts arbitrary user text and needs its own
+  design for injection, scoping and conversation state.
 
 ## Project structure
 
@@ -350,5 +371,14 @@ The engine is a framework-free package inside the backend:
 - The application connects to Postgres as `app_user` (`nosuperuser`,
   `nobypassrls`), never as `postgres`, which has `rolbypassrls = true` and
   would ignore every policy while every test still passed.
+- The AI layer receives only pre-formatted strings from
+  `guidance/presentation.py`, never raw engine objects, and never computes. If
+  a sentence needs a number, that number is a field on the engine's result and
+  a token in the presentation dictionary — add it there rather than letting the
+  model derive it.
+- The fallback path must never raise. `guidance/service.py` renders the
+  template through the same validation chain as generated prose, so it catches
+  its own rejection and returns a fixed sentence: a 500 on the path whose job
+  is not failing is worse than dull copy.
 - Never hardcode API keys or database URLs. Use environment variables and
   keep a `.env.example` file up to date.
