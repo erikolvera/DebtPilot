@@ -49,6 +49,12 @@ export function DebtTable({ debts, onChange }: Props) {
         // truncated, while the APR column sat half empty. The numeric columns
         // need only what a formatted amount occupies.
         //
+        // The Remove column carries no width class on purpose: `sr-only` sets
+        // position:absolute, which takes that <th> out of the table's column
+        // model entirely, so a width there would be inert decoration. Fixed
+        // layout gives the fifth column whatever the four above leave — the
+        // 6% these four do not claim.
+        //
         // ponytail: measured ceiling of the resulting 380px rail — the name
         // fits ~16 characters ("Visa Signature" yes, "Chase Sapphire Reserve"
         // no) and Owed fits up to 99,999.99. Both are inputs, so longer values
@@ -66,7 +72,7 @@ export function DebtTable({ debts, onChange }: Props) {
               <th scope="col" className="eyebrow w-[22%] py-2 text-right font-normal">Owed</th>
               <th scope="col" className="eyebrow w-[16%] py-2 text-right font-normal">APR</th>
               <th scope="col" className="eyebrow w-[18%] py-2 text-right font-normal">Min</th>
-              <th scope="col" className="sr-only w-[6%]">Remove</th>
+              <th scope="col" className="sr-only">Remove</th>
             </tr>
           </thead>
           <tbody>

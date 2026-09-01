@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import {
   apiBase,
   buildRequest,
@@ -72,7 +72,25 @@ describe("apiBase", () => {
   });
 
   test("falls back when the variable is unset", () => {
-    expect(apiBase(undefined)).toBe(DEFAULT_API_BASE);
+    // stubEnv, not `apiBase(undefined)`: passing undefined ACTIVATES the
+    // default parameter, which reads the real process.env — so this passed only
+    // by luck, and failed for anyone with NEXT_PUBLIC_API_BASE_URL exported in
+    // their shell.
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", undefined);
+    expect(apiBase()).toBe(DEFAULT_API_BASE);
+    vi.unstubAllEnvs();
+  });
+
+  test("reads the environment when no argument is given", () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://from-env.example.com/");
+    expect(apiBase()).toBe("https://from-env.example.com");
+    vi.unstubAllEnvs();
+  });
+
+  test("falls back for a lone slash", () => {
+    // Truthy, so `||` lets it through; stripping the slash leaves "".
+    expect(apiBase("/")).toBe(DEFAULT_API_BASE);
+    expect(apiBase("///")).toBe(DEFAULT_API_BASE);
   });
 
   test("falls back when the variable is an empty or blank string", () => {

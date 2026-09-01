@@ -40,7 +40,11 @@ export function apiBase(
   raw: string | undefined = process.env.NEXT_PUBLIC_API_BASE_URL,
 ): string {
   const trimmed = raw?.trim();
-  return (trimmed || DEFAULT_API_BASE).replace(/\/+$/, "");
+  // The second fallback is not redundant. A lone "/" is truthy, so it survives
+  // the first one, and stripping its trailing slash leaves "" -- landing on the
+  // exact relative-path failure this function exists to prevent.
+  const base = (trimmed || DEFAULT_API_BASE).replace(/\/+$/, "");
+  return base || DEFAULT_API_BASE;
 }
 
 const BASE = apiBase();
