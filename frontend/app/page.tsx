@@ -39,6 +39,11 @@ export default function Page() {
 
   const { plan, pending, error } = usePlan(portfolio.debts, portfolio.extra);
 
+  // A plan for a portfolio that no longer exists must not render as the current
+  // one. usePlan deliberately keeps the last good plan through a mid-edit, which
+  // is right while cards exist and wrong once they do not.
+  const shownPlan = portfolio.debts.length === 0 ? null : plan;
+
   const nameFor = useMemo(() => {
     const byId = new Map(
       portfolio.debts.map((debt) => [debt.id, debt.name.trim() || "that card"]),
@@ -46,11 +51,11 @@ export default function Page() {
     return (debtId: string) => byId.get(debtId) ?? "a card";
   }, [portfolio.debts]);
 
-  const tracks: Track[] = plan
+  const tracks: Track[] = shownPlan
     ? [
-        { key: "baseline", label: "Do nothing", accent: "var(--baseline)", scenario: plan.scenarios.baseline },
-        { key: "snowball", label: "Snowball", accent: "var(--snowball)", scenario: plan.scenarios.snowball },
-        { key: "avalanche", label: "Avalanche", accent: "var(--avalanche)", scenario: plan.scenarios.avalanche },
+        { key: "baseline", label: "Do nothing", accent: "var(--baseline)", scenario: shownPlan.scenarios.baseline },
+        { key: "snowball", label: "Snowball", accent: "var(--snowball)", scenario: shownPlan.scenarios.snowball },
+        { key: "avalanche", label: "Avalanche", accent: "var(--avalanche)", scenario: shownPlan.scenarios.avalanche },
       ]
     : [];
 
@@ -84,7 +89,7 @@ export default function Page() {
             </p>
           )}
 
-          {plan === null ? (
+          {shownPlan === null ? (
             <p className="text-ink-soft">
               {portfolio.debts.length === 0
                 ? "Add a card to see your payoff date."
@@ -100,35 +105,35 @@ export default function Page() {
               <div className="mt-6">
                 <EscapeChart
                   tracks={tracks}
-                  startMonth={plan.start_month}
+                  startMonth={shownPlan.start_month}
                   dimmed={pending}
                 />
               </div>
 
               <div className="mt-12 grid gap-8 sm:grid-cols-3">
                 <ScenarioSummary
-                  scenario={plan.scenarios.baseline}
+                  scenario={shownPlan.scenarios.baseline}
                   label="Do nothing"
                   accent="var(--baseline)"
                   nameFor={nameFor}
                   note={null}
                 />
                 <ScenarioSummary
-                  scenario={plan.scenarios.snowball}
+                  scenario={shownPlan.scenarios.snowball}
                   label="Snowball"
                   accent="var(--snowball)"
                   nameFor={nameFor}
                   note="Smallest balance first."
                 />
                 <ScenarioSummary
-                  scenario={plan.scenarios.avalanche}
+                  scenario={shownPlan.scenarios.avalanche}
                   label="Avalanche"
                   accent="var(--avalanche)"
                   nameFor={nameFor}
                   note={
-                    plan.comparison.interest_saved_avalanche_vs_snowball === null
+                    shownPlan.comparison.interest_saved_avalanche_vs_snowball === null
                       ? "Highest rate first."
-                      : `Highest rate first. ${delta(plan.comparison.interest_saved_avalanche_vs_snowball)} less interest than snowball.`
+                      : `Highest rate first. ${delta(shownPlan.comparison.interest_saved_avalanche_vs_snowball)} less interest than snowball.`
                   }
                 />
               </div>

@@ -46,15 +46,18 @@ export function moneyWhole(value: string): string {
   return formatDecimal(USD_WHOLE, value);
 }
 
-const MONTHS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
+// Keyed by the raw two-digit string rather than indexed by number, so this
+// needs no float conversion -- see the no-restricted-syntax override for this
+// file in eslint.config.mjs.
+const MONTHS: Record<string, string> = {
+  "01": "Jan", "02": "Feb", "03": "Mar", "04": "Apr", "05": "May", "06": "Jun",
+  "07": "Jul", "08": "Aug", "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dec",
+};
 
 /** "2029-07" -> "Jul 2029". */
 export function calendarMonth(value: string): string {
   const [year, month] = value.split("-");
-  return `${MONTHS[Number(month) - 1]} ${year}`;
+  return `${MONTHS[month]} ${year}`;
 }
 
 /** 37 -> "3 yr 1 mo". Duration, not money: integer arithmetic is fine here. */

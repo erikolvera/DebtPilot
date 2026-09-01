@@ -36,14 +36,22 @@ export function Narrative({ debts, extra }: Props) {
     latest.current = { debts, extra };
   });
 
+  // Which request produced the prose currently on screen, so render can tell
+  // whether it still describes the current debts/extra. State, not a ref:
+  // react-hooks/refs (eslint-plugin-react-hooks v7) rejects reading `.current`
+  // during render, which the staleness check below has to do every render.
+  const [askedFor, setAskedFor] = useState<string | null>(null);
+
   const ask = useCallback(() => {
     const { debts, extra } = latest.current;
+    const signature = JSON.stringify(buildRequest(debts, extra));
     const controller = new AbortController();
     setLoading(true);
     setFailed(false);
     fetchExplanation(buildRequest(debts, extra), controller.signal)
       .then((next) => {
         settled.current = true;
+        setAskedFor(signature);
         setResult(next);
         setLoading(false);
       })
@@ -79,6 +87,37 @@ export function Narrative({ debts, extra }: Props) {
     };
   }, [ask]);
 
+  // A result stays on screen through edits (no auto-refetch — the endpoint
+  // allows ten calls per hour), so it can describe a portfolio the user has
+  // since changed. Compare against what actually produced the prose.
+  const stale =
+    result !== null && askedFor !== JSON.stringify(buildRequest(debts, extra));
+
+  const prose = result !== null && (
+    <>
+      <h3 className="mt-4 font-display text-2xl leading-tight">{result.headline}</h3>
+      {/*
+        Plain text into a <p>. The response is prose assembled by
+        substituting server-side values into a model-written template; it
+        is not markup and must never be parsed as any.
+        Do not introduce dangerouslySetInnerHTML here.
+      */}
+      <p className="mt-3 whitespace-pre-line leading-relaxed">{result.body}</p>
+      {result.source === "template" && (
+        <p className="mt-3 text-xs text-ink-soft">
+          Written from a fixed template while the explainer is unavailable.
+          The figures are the same.
+        </p>
+      )}
+      {stale && (
+        <p className="mt-3 text-xs text-ink-soft">
+          This describes earlier numbers. &quot;Explain again&quot; will bring it
+          up to date.
+        </p>
+      )}
+    </>
+  );
+
   return (
     <section aria-labelledby="narrative-heading" className="mt-14 max-w-prose">
       <h2 id="narrative-heading" className="eyebrow">
@@ -91,28 +130,16 @@ export function Narrative({ debts, extra }: Props) {
           <div className="h-4 w-full rounded bg-ink/10" />
           <div className="h-4 w-5/6 rounded bg-ink/10" />
         </div>
-      ) : result !== null ? (
-        <>
-          <h3 className="mt-4 font-display text-2xl leading-tight">{result.headline}</h3>
-          {/*
-            Plain text into a <p>. The response is prose assembled by
-            substituting server-side values into a model-written template; it
-            is not markup and must never be parsed as any.
-            Do not introduce dangerouslySetInnerHTML here.
-          */}
-          <p className="mt-3 whitespace-pre-line leading-relaxed">{result.body}</p>
-          {result.source === "template" && (
-            <p className="mt-3 text-xs text-ink-soft">
-              Written from a fixed template while the explainer is unavailable.
-              The figures are the same.
-            </p>
-          )}
-        </>
       ) : failed ? (
-        <p className="mt-4 text-sm text-ink-soft">
-          The explainer didn&apos;t answer. The plan above is unaffected.
-        </p>
-      ) : null}
+        <>
+          <p className="mt-4 text-sm text-ink-soft">
+            The explainer didn&apos;t answer. The plan above is unaffected.
+          </p>
+          {prose}
+        </>
+      ) : (
+        prose
+      )}
 
       <button
         type="button"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { DebtDraft } from "@/lib/api";
 import { debtErrors, MAX_DEBTS } from "@/lib/validate";
 
@@ -23,11 +24,22 @@ export function DebtTable({ debts, onChange }: Props) {
 
   const remove = (id: string) => onChange(debts.filter((debt) => debt.id !== id));
 
-  const add = () =>
-    onChange([
-      ...debts,
-      { id: crypto.randomUUID(), name: "", balance: "", apr: "", minimum_payment: "" },
-    ]);
+  // The new row renders above the still-focused "Add a card" button, so Tab
+  // skips it. Record which row to focus, then move focus once it exists.
+  const focusId = useRef<string | null>(null);
+  const nameInputs = useRef(new Map<string, HTMLInputElement>());
+
+  useEffect(() => {
+    if (focusId.current === null) return;
+    nameInputs.current.get(focusId.current)?.focus();
+    focusId.current = null;
+  }, [debts]);
+
+  const add = () => {
+    const id = crypto.randomUUID();
+    focusId.current = id;
+    onChange([...debts, { id, name: "", balance: "", apr: "", minimum_payment: "" }]);
+  };
 
   // Messages live below the table, not in the cells: the numeric columns are
   // ~112px wide, so an in-cell message wrapped to three lines and doubled the
@@ -84,10 +96,15 @@ export function DebtTable({ debts, onChange }: Props) {
           <tbody>
             {debts.map((debt) => {
               const errors = debtErrors(debt);
+              const cardLabel = debt.name.trim() || "Untitled card";
               return (
                 <tr key={debt.id} className="border-b border-rule/60">
-                  <td className="py-1">
+                  <th scope="row" className="py-1 font-normal">
                     <input
+                      ref={(el) => {
+                        if (el) nameInputs.current.set(debt.id, el);
+                        else nameInputs.current.delete(debt.id);
+                      }}
                       className="w-full rounded bg-transparent px-2 py-1.5 text-sm outline-none focus:bg-ink/5"
                       value={debt.name}
                       onChange={(event) => update(debt.id, "name", event.target.value)}
@@ -95,7 +112,7 @@ export function DebtTable({ debts, onChange }: Props) {
                       aria-invalid={errors.name !== undefined}
                       placeholder="Card name"
                     />
-                  </td>
+                  </th>
                   <td className="py-1">
                     <input
                       className={CELL}
@@ -106,7 +123,7 @@ export function DebtTable({ debts, onChange }: Props) {
                       inputMode="decimal"
                       value={debt.balance}
                       onChange={(event) => update(debt.id, "balance", event.target.value)}
-                      aria-label="Balance owed"
+                      aria-label={`${cardLabel} — balance owed`}
                       aria-invalid={errors.balance !== undefined}
                       placeholder="0.00"
                     />
@@ -118,7 +135,7 @@ export function DebtTable({ debts, onChange }: Props) {
                       inputMode="decimal"
                       value={debt.apr}
                       onChange={(event) => update(debt.id, "apr", event.target.value)}
-                      aria-label="Annual percentage rate"
+                      aria-label={`${cardLabel} — annual percentage rate`}
                       aria-invalid={errors.apr !== undefined}
                       placeholder="0.00"
                     />
@@ -130,7 +147,7 @@ export function DebtTable({ debts, onChange }: Props) {
                       inputMode="decimal"
                       value={debt.minimum_payment}
                       onChange={(event) => update(debt.id, "minimum_payment", event.target.value)}
-                      aria-label="Minimum payment"
+                      aria-label={`${cardLabel} — minimum payment`}
                       aria-invalid={errors.minimum_payment !== undefined}
                       placeholder="0.00"
                     />

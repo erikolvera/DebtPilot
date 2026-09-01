@@ -48,7 +48,10 @@ describe("buildRequest", () => {
       { id: "a", name: "A", balance: "1000.10", apr: "0.00", minimum_payment: "25.00" },
     ];
     const body = buildRequest(drafts, "0.00", new Date(2026, 8, 1));
-    // A parseFloat/toFixed round trip would render these "1000.1" and "0".
+    // A bare `parseFloat` (with no `.toFixed(2)` after it) would render these
+    // "1000.1" and "0" -- parseFloat("1000.10").toFixed(2) actually round-trips
+    // to "1000.10" fine, so it's specifically an unformatted parseFloat that
+    // drops the precision this test guards.
     expect(body.debts[0].balance).toBe("1000.10");
     expect(body.debts[0].apr).toBe("0.00");
     expect(body.extra_monthly_payment).toBe("0.00");
@@ -110,5 +113,20 @@ describe("apiBase", () => {
 
   test("leaves an internal path segment alone", () => {
     expect(apiBase("https://example.com/api/")).toBe("https://example.com/api");
+  });
+
+  test("falls back to localhost when blank outside production", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    expect(apiBase("")).toBe(DEFAULT_API_BASE);
+    vi.unstubAllEnvs();
+  });
+
+  test("throws when blank in a production build", () => {
+    // A blank var is inlined at build time, so a production build made without
+    // it would silently ship pointing at localhost with no way to repair the
+    // artifact at runtime -- this must fail loudly instead.
+    vi.stubEnv("NODE_ENV", "production");
+    expect(() => apiBase("")).toThrow(/NEXT_PUBLIC_API_BASE_URL/);
+    vi.unstubAllEnvs();
   });
 });

@@ -13,6 +13,19 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    files: ["lib/format.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "CallExpression[callee.name=/^(Number|parseFloat|parseInt)$/]",
+          message:
+            "No float conversion in format.ts. Intl.NumberFormat.format accepts a decimal string and formats it exactly; Number(value) would construct the IEEE-754 double the backend's validator exists to exclude. No test can catch this -- within the money contract every value round-trips identically -- so the lint rule is the enforcement.",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;
