@@ -19,6 +19,9 @@ export function Narrative({ debts, extra }: Props) {
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const askedOnce = useRef(false);
+  // Whether any request has actually completed (succeeded or genuinely failed).
+  // An abort is not settled — the answer never arrived.
+  const settled = useRef(false);
 
   // Props are read through a ref so `ask` has a STABLE identity. If `ask`
   // depended on `debts`/`extra`, the mount effect below would depend on them
@@ -40,11 +43,13 @@ export function Narrative({ debts, extra }: Props) {
     setFailed(false);
     fetchExplanation(buildRequest(debts, extra), controller.signal)
       .then((next) => {
+        settled.current = true;
         setResult(next);
         setLoading(false);
       })
       .catch((cause: unknown) => {
         if (isAbort(cause)) return;
+        settled.current = true;
         // A failed call leaves the previous narrative in place and never
         // blocks the plan. The plan is the product; this is a layer on top of
         // it, which is why the API returns them separately.
@@ -61,7 +66,17 @@ export function Narrative({ debts, extra }: Props) {
   useEffect(() => {
     if (askedOnce.current) return;
     askedOnce.current = true;
-    return ask();
+    const cancel = ask();
+    return () => {
+      // React StrictMode remounts every effect once in development, and that
+      // remount's cleanup aborts the one request we are allowed to make.
+      // Without releasing the guard the retry never happens: the skeleton stays
+      // up and "Explain this plan" stays disabled for the whole dev session.
+      // Release it ONLY if nothing settled — a completed request must stay
+      // guarded, or a remount would spend another of the ten calls per hour.
+      if (!settled.current) askedOnce.current = false;
+      cancel();
+    };
   }, [ask]);
 
   return (

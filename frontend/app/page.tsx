@@ -92,7 +92,7 @@ export default function Page() {
                   ? "No plan yet — the planner didn't answer."
                   : pending
                     ? "Working out your plan…"
-                    : "Check the highlighted amounts above — one of them isn't a number the planner can use."}
+                    : "Fix the highlighted fields above and the plan will update."}
             </p>
           ) : (
             <>
