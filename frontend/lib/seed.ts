@@ -34,5 +34,6 @@ export function seedFinancialProfile() {
     expenses: SEED_EXPENSES.map((row) => ({ ...row })),
     debts: SEED_DEBTS.map((row) => ({ ...row })),
     extra: "650.00",
+    preferredStrategy: null,
   };
 }

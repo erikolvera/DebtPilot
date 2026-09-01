@@ -13,6 +13,7 @@ from app.cashflow import (
 from app.engine import Debt, compute_plans
 from app.engine.money import to_cents
 
+from ..guidance import build_payoff_guidance
 from ..mappers import to_response
 from ..schemas import (
     CashFlowOut,
@@ -135,10 +136,16 @@ def create_financial_report(
 
     has_debts = any(debt.balance > ZERO for debt in debts)
     payoff_plan = None
+    payoff_guidance = None
     if cash_flow.status is not CashFlowStatus.DEFICIT and has_debts:
-        payoff_plan = to_response(
-            compute_plans(debts, allocation.planned_extra_payment),
-            request.start_month,
+        comparison = compute_plans(debts, allocation.planned_extra_payment)
+        payoff_plan = to_response(comparison, request.start_month)
+        payoff_guidance = build_payoff_guidance(
+            debts=debts,
+            current_extra=allocation.planned_extra_payment,
+            maximum_extra=cash_flow.maximum_affordable_extra_payment,
+            current_comparison=comparison,
+            start_month=request.start_month,
         )
 
     return FinancialReportResponse(
@@ -163,6 +170,7 @@ def create_financial_report(
             is_affordable=allocation.is_affordable,
         ),
         payoff_plan=payoff_plan,
+        payoff_guidance=payoff_guidance,
         recommendations=_recommendations(
             cash_flow.status,
             has_debts,

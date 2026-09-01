@@ -7,6 +7,7 @@ import {
   loadFinancialProfile,
   saveFinancialProfile,
   type FinancialProfile,
+  type PreferredStrategy,
 } from "./profileStorage";
 import { seedFinancialProfile } from "./seed";
 
@@ -35,6 +36,8 @@ export function useFinancialProfile() {
       setProfile((current) => ({ ...current, debts })),
     setExtra: (extra: string) =>
       setProfile((current) => ({ ...current, extra })),
+    setPreferredStrategy: (preferredStrategy: PreferredStrategy | null) =>
+      setProfile((current) => ({ ...current, preferredStrategy })),
     saveNow: () => saveFinancialProfile(browserStorage(), profile),
   };
 }

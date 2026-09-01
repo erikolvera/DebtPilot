@@ -238,11 +238,35 @@ class RecommendationOut(BaseModel):
     detail: str
 
 
+class CompactOptionImpactOut(BaseModel):
+    outcome: Literal["paid_off", "never_pays_off"]
+    payoff_month: str | None
+    months_to_payoff: int | None
+    total_interest_paid: Money
+    months_saved_vs_current: int | None
+    interest_saved_vs_current: Money | None
+
+
+class PayoffPaymentOptionOut(BaseModel):
+    kind: Literal["current", "split_difference", "maximum"]
+    extra_monthly_payment: Money
+    additional_monthly_payment: Money
+    monthly_cushion_remaining: Money
+    snowball: CompactOptionImpactOut
+    avalanche: CompactOptionImpactOut
+
+
+class PayoffGuidanceOut(BaseModel):
+    recommended_strategy: Literal["snowball", "avalanche"] | None
+    payment_options: list[PayoffPaymentOptionOut]
+
+
 class FinancialReportResponse(BaseModel):
     start_month: str
     total_debt: Money
     cash_flow: CashFlowOut
     debt_payment_budget: DebtPaymentBudgetOut
     payoff_plan: PayoffPlanResponse | None
+    payoff_guidance: PayoffGuidanceOut | None
     recommendations: list[RecommendationOut]
     estimate_disclosure: str

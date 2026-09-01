@@ -8,15 +8,19 @@ import type {
 
 export type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
+export type PreferredStrategy = "snowball" | "avalanche";
+
 export type FinancialProfile = {
   incomes: IncomeDraft[];
   expenses: ExpenseDraft[];
   debts: FinancialDebtDraft[];
   extra: string;
+  preferredStrategy: PreferredStrategy | null;
 };
 
-const PROFILE_KEY = "debtpilot.financial-profile.v3";
-const PREVIOUS_PROFILE_KEY = "debtpilot.financial-profile.v2";
+const PROFILE_KEY = "debtpilot.financial-profile.v4";
+const PREVIOUS_PROFILE_KEY = "debtpilot.financial-profile.v3";
+const V2_PROFILE_KEY = "debtpilot.financial-profile.v2";
 const LEGACY_KEY = "debtpilot.portfolio.v1";
 const INCOME_FREQUENCIES = new Set<IncomeFrequency>([
   "salary",
@@ -43,6 +47,10 @@ const EXPENSE_CATEGORIES = new Set([
   "subscriptions",
   "personal",
   "other",
+]);
+const PREFERRED_STRATEGIES = new Set<PreferredStrategy>([
+  "snowball",
+  "avalanche",
 ]);
 
 function hasStrings(value: unknown, fields: string[]): value is Record<string, string> {
@@ -72,7 +80,9 @@ function isDebt(value: unknown): value is FinancialDebtDraft {
   );
 }
 
-function isProfile(value: unknown): value is FinancialProfile {
+type V3FinancialProfile = Omit<FinancialProfile, "preferredStrategy">;
+
+function isV3Profile(value: unknown): value is V3FinancialProfile {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
   return (
@@ -86,6 +96,16 @@ function isProfile(value: unknown): value is FinancialProfile {
     Array.isArray(record.debts) &&
     record.debts.length <= 20 &&
     record.debts.every(isDebt)
+  );
+}
+
+function isProfile(value: unknown): value is FinancialProfile {
+  if (!isV3Profile(value)) return false;
+  const preferredStrategy = (value as Record<string, unknown>).preferredStrategy;
+  return (
+    preferredStrategy === null ||
+    (typeof preferredStrategy === "string" &&
+      PREFERRED_STRATEGIES.has(preferredStrategy as PreferredStrategy))
   );
 }
 
@@ -106,10 +126,16 @@ function migrateLegacy(value: unknown): FinancialProfile | null {
     expenses: [],
     debts: debts as FinancialDebtDraft[],
     extra: record.extra,
+    preferredStrategy: null,
   };
 }
 
 function migratePreviousProfile(value: unknown): FinancialProfile | null {
+  if (!isV3Profile(value)) return null;
+  return { ...value, preferredStrategy: null };
+}
+
+function migrateV2Profile(value: unknown): FinancialProfile | null {
   if (typeof value !== "object" || value === null) return null;
   const record = value as Record<string, unknown>;
   if (
@@ -142,6 +168,7 @@ function migratePreviousProfile(value: unknown): FinancialProfile | null {
     expenses: record.expenses,
     debts: record.debts,
     extra: record.extra,
+    preferredStrategy: null,
   };
 }
 
@@ -159,6 +186,10 @@ export function loadFinancialProfile(
     const previous = storage.getItem(PREVIOUS_PROFILE_KEY);
     if (previous) {
       return migratePreviousProfile(JSON.parse(previous)) ?? fallback;
+    }
+    const v2 = storage.getItem(V2_PROFILE_KEY);
+    if (v2) {
+      return migrateV2Profile(JSON.parse(v2)) ?? fallback;
     }
     const legacy = storage.getItem(LEGACY_KEY);
     if (!legacy) return fallback;

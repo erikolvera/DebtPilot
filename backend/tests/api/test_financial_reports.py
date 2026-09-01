@@ -62,6 +62,11 @@ def test_surplus_report_composes_cash_flow_and_payoff_plan(client):
         "is_affordable": True,
     }
     assert body["payoff_plan"]["scenarios"]["avalanche"]["outcome"] == "paid_off"
+    assert body["payoff_guidance"]["recommended_strategy"] is None
+    assert [
+        option["extra_monthly_payment"]
+        for option in body["payoff_guidance"]["payment_options"]
+    ] == ["500.00", "1200.00", "1900.00"]
     assert [item["code"] for item in body["recommendations"]] == [
         "compare_strategies",
         "assign_remaining_surplus",
@@ -78,6 +83,9 @@ def test_unaffordable_extra_is_capped_before_simulation(client):
     assert budget["planned_extra_monthly_payment"] == "1900.00"
     assert budget["extra_payment_gap"] == "600.00"
     assert not budget["is_affordable"]
+    assert [
+        option["kind"] for option in body["payoff_guidance"]["payment_options"]
+    ] == ["current"]
     assert [item["code"] for item in body["recommendations"]] == [
         "reduce_extra_payment",
         "compare_strategies",
@@ -106,6 +114,7 @@ def test_deficit_reports_shortfall_and_withholds_a_fake_strategy(client):
     assert body["cash_flow"]["shortfall"] == "100.00"
     assert body["debt_payment_budget"]["planned_extra_monthly_payment"] == "0.00"
     assert body["payoff_plan"] is None
+    assert body["payoff_guidance"] is None
     assert [item["code"] for item in body["recommendations"]] == ["close_shortfall"]
 
 
@@ -122,6 +131,9 @@ def test_break_even_keeps_a_zero_extra_plan_and_protects_minimums(client):
 
     assert body["cash_flow"]["status"] == "break_even"
     assert body["payoff_plan"] is not None
+    assert [
+        option["kind"] for option in body["payoff_guidance"]["payment_options"]
+    ] == ["current"]
     assert [item["code"] for item in body["recommendations"]] == [
         "protect_minimums"
     ]
@@ -135,6 +147,7 @@ def test_no_debt_returns_a_cash_report_without_a_payoff_plan(client):
 
     assert body["total_debt"] == "0.00"
     assert body["payoff_plan"] is None
+    assert body["payoff_guidance"] is None
     assert [item["code"] for item in body["recommendations"]] == [
         "build_cash_reserve"
     ]
@@ -209,3 +222,163 @@ def test_report_rejects_unknown_expense_categories(client):
 
 def test_report_route_is_versioned(client):
     assert client.post("/financial-reports", json=report_body()).status_code == 404
+
+
+def test_seed_report_has_pinned_affordable_payment_options(client):
+    body = client.post(
+        "/v1/financial-reports",
+        json=report_body(
+            incomes=[
+                {
+                    "id": "paycheck",
+                    "name": "Take-home paycheck",
+                    "amount": "2307.69",
+                    "frequency": "biweekly",
+                },
+                {
+                    "id": "recurring",
+                    "name": "Recurring side income",
+                    "amount": "300.00",
+                    "frequency": "monthly",
+                },
+            ],
+            expenses=[
+                {
+                    "id": f"expense-{index}",
+                    "name": name,
+                    "category": category,
+                    "monthly_amount": amount,
+                }
+                for index, (name, category, amount) in enumerate(
+                    [
+                        ("Rent", "housing", "1700.00"),
+                        ("Groceries", "food", "600.00"),
+                        ("Utilities", "utilities", "300.00"),
+                        ("Transportation", "transportation", "450.00"),
+                        ("Insurance", "insurance", "350.00"),
+                        ("Healthcare", "healthcare", "150.00"),
+                        ("Subscriptions", "subscriptions", "100.00"),
+                        ("Personal and other", "personal", "300.00"),
+                    ]
+                )
+            ],
+            debts=[
+                {
+                    "id": "visa",
+                    "name": "Visa Signature",
+                    "type": "credit_card",
+                    "balance": "6120.00",
+                    "apr": "24.99",
+                    "minimum_payment": "122.40",
+                },
+                {
+                    "id": "store",
+                    "name": "Store card",
+                    "type": "credit_card",
+                    "balance": "1840.00",
+                    "apr": "27.99",
+                    "minimum_payment": "46.00",
+                },
+                {
+                    "id": "credit",
+                    "name": "Credit union",
+                    "type": "personal_loan",
+                    "balance": "3250.00",
+                    "apr": "14.50",
+                    "minimum_payment": "65.00",
+                },
+            ],
+            requested_extra_monthly_payment="650.00",
+        ),
+    ).json()
+
+    guidance = body["payoff_guidance"]
+    assert guidance["recommended_strategy"] == "avalanche"
+    assert [option["kind"] for option in guidance["payment_options"]] == [
+        "current",
+        "split_difference",
+        "maximum",
+    ]
+    assert [
+        (
+            option["extra_monthly_payment"],
+            option["additional_monthly_payment"],
+            option["monthly_cushion_remaining"],
+            option["avalanche"]["months_to_payoff"],
+        )
+        for option in guidance["payment_options"]
+    ] == [
+        ("650.00", "0.00", "466.60", 15),
+        ("883.30", "233.30", "233.30", 12),
+        ("1116.60", "466.60", "0.00", 10),
+    ]
+    assert guidance["payment_options"][1]["avalanche"]["months_saved_vs_current"] == 3
+    assert guidance["payment_options"][1]["avalanche"][
+        "interest_saved_vs_current"
+    ] == "344.03"
+
+
+def test_half_cent_split_rounds_up_and_duplicate_amounts_are_removed(client):
+    body = client.post(
+        "/v1/financial-reports",
+        json=report_body(
+            incomes=[
+                {
+                    "id": "pay",
+                    "name": "Pay",
+                    "amount": "3200.01",
+                    "frequency": "monthly",
+                }
+            ],
+            requested_extra_monthly_payment="100.00",
+        ),
+    ).json()
+
+    options = body["payoff_guidance"]["payment_options"]
+    assert [(option["kind"], option["extra_monthly_payment"]) for option in options] == [
+        ("current", "100.00"),
+        ("maximum", "100.01"),
+    ]
+
+
+def test_never_payoff_comparisons_have_null_savings(client):
+    body = client.post(
+        "/v1/financial-reports",
+        json=report_body(
+            incomes=[
+                {
+                    "id": "pay",
+                    "name": "Pay",
+                    "amount": "1021.00",
+                    "frequency": "monthly",
+                }
+            ],
+            expenses=[
+                {
+                    "id": "rent",
+                    "name": "Rent",
+                    "category": "housing",
+                    "monthly_amount": "1000.00",
+                }
+            ],
+            debts=[
+                {
+                    "id": "card",
+                    "name": "Card",
+                    "type": "credit_card",
+                    "balance": "1000.00",
+                    "apr": "24.00",
+                    "minimum_payment": "10.00",
+                }
+            ],
+            requested_extra_monthly_payment="0.00",
+        ),
+    ).json()
+
+    guidance = body["payoff_guidance"]
+    assert guidance["recommended_strategy"] is None
+    assert guidance["payment_options"][0]["avalanche"]["outcome"] == "never_pays_off"
+    maximum = guidance["payment_options"][-1]["avalanche"]
+    assert maximum["outcome"] == "paid_off"
+    assert maximum["months_saved_vs_current"] is None
+    assert maximum["interest_saved_vs_current"] is None

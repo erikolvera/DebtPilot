@@ -18,7 +18,14 @@ export function ExtraPayment({ value, onChange, maximumAffordable, plannedExtra,
   // The one place a money value becomes a number: a range input's value is
   // numeric by nature. It is converted straight back to a fixed-2 string and
   // never used for arithmetic.
-  const sliderValue = invalid ? 0 : Math.min(Number(value), EXTRA_SLIDER_MAX);
+  const numericValue = invalid ? 0 : Number(value);
+  const numericMaximumAffordable = Number(maximumAffordable ?? 0);
+  const sliderMax = Math.max(
+    EXTRA_SLIDER_MAX,
+    Number.isFinite(numericValue) ? numericValue : 0,
+    Number.isFinite(numericMaximumAffordable) ? numericMaximumAffordable : 0,
+  );
+  const sliderValue = invalid ? 0 : Math.min(numericValue, sliderMax);
 
   return (
     <section aria-labelledby="extra-heading" className="panel panel-warm">
@@ -44,8 +51,8 @@ export function ExtraPayment({ value, onChange, maximumAffordable, plannedExtra,
         className="mt-6 w-full accent-[var(--primary)]"
         type="range"
         min={0}
-        max={EXTRA_SLIDER_MAX}
-        step={5}
+        max={sliderMax}
+        step={0.01}
         value={sliderValue}
         onChange={(event) => onChange(Number(event.target.value).toFixed(2))}
         aria-label="Extra payment each month"

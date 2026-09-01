@@ -8,9 +8,23 @@ type Props = {
   accent: string;
   nameFor: (debtId: string) => string;
   note: string | null;
+  selected?: boolean;
+  recommended?: boolean;
+  disabled?: boolean;
+  onSelect?: () => void;
 };
 
-export function ScenarioSummary({ scenario, label, accent, nameFor, note }: Props) {
+export function ScenarioSummary({
+  scenario,
+  label,
+  accent,
+  nameFor,
+  note,
+  selected = false,
+  recommended = false,
+  disabled = false,
+  onSelect,
+}: Props) {
   const figures = scenarioFigures(scenario);
   const tone =
     label === "Avalanche"
@@ -18,18 +32,34 @@ export function ScenarioSummary({ scenario, label, accent, nameFor, note }: Prop
       : label === "Snowball"
         ? "bg-coral-soft"
         : "bg-[#f1f3f8]";
+  const selectable = onSelect !== undefined;
 
   return (
-    <div className={`rounded-2xl p-5 ${tone}`}>
-      <div className="flex items-center gap-2">
-        {/* The scenario colour identifies the row as a swatch. It never carries
-            text: #D98324 on #E8EBF0 is ~2.6:1, well under the body-text floor. */}
+    <article
+      className={`flex h-full flex-col rounded-2xl border-2 p-5 transition ${tone} ${
+        selected
+          ? "border-primary shadow-[0_10px_28px_rgb(88_78_232/14%)]"
+          : "border-transparent"
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Color is a swatch only; the adjacent text carries the label. */}
         <span
           aria-hidden="true"
           className="inline-block h-2.5 w-2.5 rounded-full"
           style={{ background: accent }}
         />
         <h3 className="text-sm font-semibold">{label}</h3>
+        {recommended && (
+          <span className="rounded-full bg-white/75 px-2 py-1 text-[0.6875rem] font-semibold text-primary">
+            Recommended
+          </span>
+        )}
+        {!selectable && (
+          <span className="rounded-full bg-white/75 px-2 py-1 text-[0.6875rem] text-ink-soft">
+            Reference
+          </span>
+        )}
       </div>
 
       {figures.paidOff ? (
@@ -77,6 +107,24 @@ export function ScenarioSummary({ scenario, label, accent, nameFor, note }: Prop
       )}
 
       {note !== null && <p className="mt-3 text-sm text-ink-soft">{note}</p>}
-    </div>
+
+      {selectable && (
+        <div className="mt-auto pt-5">
+          <button
+            type="button"
+            onClick={onSelect}
+            disabled={disabled}
+            aria-pressed={selected}
+            className={`w-full rounded-full px-4 py-2 text-sm font-semibold disabled:pointer-events-none disabled:opacity-55 ${
+              selected
+                ? "bg-primary text-white"
+                : "border border-rule bg-white/80 text-ink hover:border-primary"
+            }`}
+          >
+            {selected ? `${label} selected` : `Choose ${label}`}
+          </button>
+        </div>
+      )}
+    </article>
   );
 }

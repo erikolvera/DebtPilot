@@ -4,14 +4,16 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { CashFlowSummary } from "@/components/CashFlowSummary";
 import { EscapeChart, type Track } from "@/components/EscapeChart";
+import { PayoffGuidance } from "@/components/PayoffGuidance";
 import { Recommendations } from "@/components/Recommendations";
 import { ScenarioSummary } from "@/components/ScenarioSummary";
 import { delta, money } from "@/lib/format";
+import { effectiveStrategy } from "@/lib/payoffGuidance";
 import { useFinancialProfile } from "@/lib/useFinancialProfile";
 import { useReport } from "@/lib/useReport";
 
 export default function ReportPage() {
-  const { profile, ready } = useFinancialProfile();
+  const { profile, ready, setExtra, setPreferredStrategy } = useFinancialProfile();
   const { report, pending, stale, error } = useReport(
     profile.incomes,
     profile.expenses,
@@ -19,6 +21,12 @@ export default function ReportPage() {
     profile.extra,
   );
   const plan = report?.payoff_plan ?? null;
+  const guidance = report?.payoff_guidance ?? null;
+  const selectedStrategy = effectiveStrategy(
+    profile.preferredStrategy,
+    guidance?.recommended_strategy ?? null,
+  );
+  const actionsDisabled = pending || stale;
 
   const nameFor = useMemo(() => {
     const names = new Map(
@@ -126,9 +134,29 @@ export default function ReportPage() {
               <div className="mt-6">
                 <EscapeChart tracks={tracks} startMonth={plan.start_month} dimmed={pending || stale} />
               </div>
-              <div className="mt-12 grid gap-5 md:grid-cols-3">
-                <ScenarioSummary scenario={plan.scenarios.baseline} label="Minimums only" accent="var(--baseline)" nameFor={nameFor} note="Minimum payments decline with the balance." />
-                <ScenarioSummary scenario={plan.scenarios.snowball} label="Snowball" accent="var(--snowball)" nameFor={nameFor} note="Smallest balance first." />
+              <div
+                className="mt-12 grid gap-5 md:grid-cols-3"
+                role="group"
+                aria-label="Choose a payoff strategy"
+              >
+                <ScenarioSummary
+                  scenario={plan.scenarios.baseline}
+                  label="Minimums only"
+                  accent="var(--baseline)"
+                  nameFor={nameFor}
+                  note="Minimum payments decline with the balance. This is a reference, not a strategy choice."
+                />
+                <ScenarioSummary
+                  scenario={plan.scenarios.snowball}
+                  label="Snowball"
+                  accent="var(--snowball)"
+                  nameFor={nameFor}
+                  note="Smallest balance first."
+                  selected={profile.preferredStrategy === "snowball"}
+                  recommended={guidance?.recommended_strategy === "snowball"}
+                  disabled={actionsDisabled}
+                  onSelect={() => setPreferredStrategy("snowball")}
+                />
                 <ScenarioSummary
                   scenario={plan.scenarios.avalanche}
                   label="Avalanche"
@@ -139,12 +167,25 @@ export default function ReportPage() {
                       ? "Highest rate first."
                       : `Highest rate first. ${delta(plan.comparison.interest_saved_avalanche_vs_snowball)} less estimated interest than Snowball.`
                   }
+                  selected={profile.preferredStrategy === "avalanche"}
+                  recommended={guidance?.recommended_strategy === "avalanche"}
+                  disabled={actionsDisabled}
+                  onSelect={() => setPreferredStrategy("avalanche")}
                 />
               </div>
               <p className="mt-8 max-w-prose text-xs leading-relaxed text-ink-soft">
                 {report.estimate_disclosure}
               </p>
             </section>
+          )}
+
+          {guidance !== null && guidance.payment_options.length > 1 && (
+            <PayoffGuidance
+              guidance={guidance}
+              strategy={selectedStrategy}
+              disabled={actionsDisabled}
+              onChooseAmount={setExtra}
+            />
           )}
 
           <Recommendations items={report.recommendations} />

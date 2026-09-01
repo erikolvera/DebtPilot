@@ -20,6 +20,9 @@ budget supports.
   other debts.
 - Monthly cash-flow status, debt total, shortfall, and unassigned surplus.
 - Affordability-aware Snowball and Avalanche comparisons.
+- Deterministic payoff options that compare the current extra payment, half of
+  the remaining surplus, and the maximum budget-supported amount.
+- A browser-local Snowball or Avalanche preference.
 - Estimated payoff dates, interest, total paid, and payoff chart.
 - Deterministic next-step recommendations.
 - Automatic browser-local saving; no account or external data connection.
@@ -34,11 +37,14 @@ budget supports.
 
 The browser posts one financial snapshot to `POST /v1/financial-reports`. The
 API calculates cash flow first, caps the requested extra payment at the
-available amount, and then calls the payoff engine. `POST /v1/payoff-plans`
-remains available as a lower-level debt-only calculation endpoint.
+available amount, and then calls the payoff engine. It also compares two
+faster, affordable payment options when unassigned cash remains.
+`POST /v1/payoff-plans` remains available as a lower-level debt-only
+calculation endpoint.
 
 Money crosses the API as decimal strings. The backend uses `Decimal` and rounds
-to cents explicitly; no generative model calculates or recommends anything.
+to cents explicitly. Payoff guidance is deterministic, and no financial data
+is sent to a generative model.
 
 ## Run locally
 

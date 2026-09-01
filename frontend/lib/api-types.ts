@@ -82,6 +82,24 @@ export interface components {
              */
             status: "deficit" | "break_even" | "surplus";
         };
+        /** CompactOptionImpactOut */
+        CompactOptionImpactOut: {
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "paid_off" | "never_pays_off";
+            /** Payoff Month */
+            payoff_month: string | null;
+            /** Months To Payoff */
+            months_to_payoff: number | null;
+            /** Total Interest Paid */
+            total_interest_paid: string;
+            /** Months Saved Vs Current */
+            months_saved_vs_current: number | null;
+            /** Interest Saved Vs Current */
+            interest_saved_vs_current: string | null;
+        };
         /**
          * ComparisonOut
          * @description Precomputed strategy differences; null when a plan never pays off.
@@ -194,6 +212,7 @@ export interface components {
             cash_flow: components["schemas"]["CashFlowOut"];
             debt_payment_budget: components["schemas"]["DebtPaymentBudgetOut"];
             payoff_plan: components["schemas"]["PayoffPlanResponse"] | null;
+            payoff_guidance: components["schemas"]["PayoffGuidanceOut"] | null;
             /** Recommendations */
             recommendations: components["schemas"]["RecommendationOut"][];
             /** Estimate Disclosure */
@@ -230,6 +249,29 @@ export interface components {
             remaining_balance: string;
             /** Cumulative Interest */
             cumulative_interest: string;
+        };
+        /** PayoffGuidanceOut */
+        PayoffGuidanceOut: {
+            /** Recommended Strategy */
+            recommended_strategy: ("snowball" | "avalanche") | null;
+            /** Payment Options */
+            payment_options: components["schemas"]["PayoffPaymentOptionOut"][];
+        };
+        /** PayoffPaymentOptionOut */
+        PayoffPaymentOptionOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "current" | "split_difference" | "maximum";
+            /** Extra Monthly Payment */
+            extra_monthly_payment: string;
+            /** Additional Monthly Payment */
+            additional_monthly_payment: string;
+            /** Monthly Cushion Remaining */
+            monthly_cushion_remaining: string;
+            snowball: components["schemas"]["CompactOptionImpactOut"];
+            avalanche: components["schemas"]["CompactOptionImpactOut"];
         };
         /** PayoffPlanRequest */
         PayoffPlanRequest: {
