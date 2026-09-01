@@ -116,6 +116,24 @@ describe("wedgePath", () => {
     expect(lineCommands).toBeLessThanOrEqual(lane.width + 5);
   });
 
+  test("carries a still-owing balance out to the axis edge", () => {
+    // The engine exits as soon as it has proved a portfolio hopeless -- for an
+    // all-underwater portfolio, after ONE month. Drawing only that window on a
+    // 120-month axis renders a debt that never clears as a stub that clears
+    // immediately, which is the opposite of the truth.
+    const path = wedgePath(totals([[1, "11222.24"]]), 120, 11222.24, lane);
+    expect(path).toContain(`L ${lane.width.toFixed(1)}`);
+  });
+
+  test("does not extend a series that reached zero", () => {
+    // A paid-off scenario ends at exactly 0 -- balances are quantized to cents
+    // with no epsilon -- and must stop at its payoff month, not run to the edge.
+    const path = wedgePath(totals([[1, "5000.00"], [2, "0.00"]]), 48, 10000, lane);
+    const endX = (2 / 48) * lane.width;
+    expect(path).toContain(`L ${endX.toFixed(1)} ${lane.height.toFixed(1)}`);
+    expect(path).not.toContain(`L ${lane.width.toFixed(1)} ${lane.height.toFixed(1)}`);
+  });
+
   test("never emits a coordinate beyond the lane width", () => {
     const past = totals([[1, "1000.00"], [200, "1000.00"]]);
     const path = wedgePath(past, 48, 5000, lane);
