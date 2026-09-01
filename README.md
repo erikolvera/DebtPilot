@@ -67,7 +67,7 @@ is sent to a generative model.
 
 The current codebase was verified with:
 
-- 248 backend tests and 99.08% coverage with branch coverage enabled.
+- 249 backend tests and 99.08% coverage with branch coverage enabled.
 - 73 frontend unit tests for API/report orchestration, storage migrations,
   validation, formatting, chart geometry, and payoff-guidance selection.
 - CI gates for backend coverage plus frontend type checking, linting, tests,
