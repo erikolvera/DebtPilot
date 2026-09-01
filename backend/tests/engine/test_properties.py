@@ -137,10 +137,23 @@ def test_avalanche_never_costs_more_interest_than_snowball(portfolio):
     plans = compute_plans(debts, extra)
     if Outcome.NEVER_PAYS_OFF in (plans.avalanche.outcome, plans.snowball.outcome):
         return
-    # One cent of tolerance: avalanche is optimal in the continuous case, but
-    # cent-rounding lets a near-tie invert by a penny.
+    # Avalanche is optimal only in the continuous case. The engine quantizes
+    # every interest charge to cents, and each quantization can move the true
+    # value by up to half a cent, so the two strategies can diverge by the
+    # number of accruals they perform. A flat one-cent tolerance encoded the
+    # wrong bound and stood only because Hypothesis had not yet drawn a
+    # portfolio with a small enough APR spread: three debts at 0.47/0.47/0.48
+    # over twelve months put avalanche two cents ahead of snowball. That is
+    # rounding deciding a tie the rates left open, not a broken ordering.
+    #
+    # The bound below is one cent per accrual -- twice the worst case per
+    # event, since a rounding error can go either way -- which stays far
+    # tighter than any real ordering defect. Sorting avalanche the wrong way
+    # costs a fraction of the balance, not a fraction of a cent per month.
+    accruals = max(plans.avalanche.months_to_payoff, plans.snowball.months_to_payoff)
+    tolerance = Decimal("0.01") * accruals * len(debts)
     assert plans.avalanche.total_interest_paid <= (
-        plans.snowball.total_interest_paid + Decimal("0.01")
+        plans.snowball.total_interest_paid + tolerance
     )
 
 

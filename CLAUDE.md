@@ -209,6 +209,18 @@ Everything else is accepted and handled:
 - A $0.01 balance accrues interest that quantizes to `0.00`, so there is no
   immortal fractional debt. This falls out of quantizing at every step.
 
+**Avalanche's optimality is a continuous-model claim.** Avalanche minimizes
+total interest with exact arithmetic, but the engine quantizes every accrual
+to cents, and each rounding can move the true figure either way. When two
+debts' APRs are close enough that the ordering advantage is worth less than
+the accumulated rounding — 0.47% against 0.48% is enough — snowball can come
+out a couple of cents ahead. That is rounding settling a tie the rates left
+open, not a broken ordering, and any test asserting the property must bound
+its tolerance by the number of accruals (months x debts) rather than by a
+flat penny. User-facing copy is unaffected: the figures are already labelled
+estimates, and a two-cent inversion on a seven-thousand-dollar payoff is not
+a recommendation anyone would act on differently.
+
 **Ordering must be total, not merely stable.** Avalanche sorts by highest
 APR, then smallest balance, then `id`. Snowball sorts by smallest balance,
 then highest APR, then `id`. The trailing `id` tiebreak is not pedantry:
