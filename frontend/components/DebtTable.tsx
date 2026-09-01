@@ -44,17 +44,29 @@ export function DebtTable({ debts, onChange }: Props) {
           No cards yet. Add one to see your payoff date.
         </p>
       ) : (
-        <table className="mt-4 w-full border-collapse">
+        // table-fixed with explicit widths: auto layout gave every column an
+        // equal-ish share, squeezing the name to ~86px so "Visa Signature"
+        // truncated, while the APR column sat half empty. The numeric columns
+        // need only what a formatted amount occupies.
+        //
+        // ponytail: measured ceiling of the resulting 380px rail — the name
+        // fits ~16 characters ("Visa Signature" yes, "Chase Sapphire Reserve"
+        // no) and Owed fits up to 99,999.99. Both are inputs, so longer values
+        // scroll rather than being lost, and a six-figure balance on a CREDIT
+        // CARD is not the case this product is for. Upgrade path if it ever
+        // matters: drop to a stacked card layout below some width instead of
+        // squeezing five columns.
+        <table className="mt-4 w-full table-fixed border-collapse">
           <caption className="sr-only">
             Your credit cards. Edit any value to update the plan.
           </caption>
           <thead>
             <tr className="border-b border-rule text-left">
-              <th scope="col" className="eyebrow py-2 font-normal">Card</th>
-              <th scope="col" className="eyebrow py-2 text-right font-normal">Owed</th>
-              <th scope="col" className="eyebrow py-2 text-right font-normal">APR</th>
-              <th scope="col" className="eyebrow py-2 text-right font-normal">Min</th>
-              <th scope="col" className="sr-only">Remove</th>
+              <th scope="col" className="eyebrow w-[38%] py-2 font-normal">Card</th>
+              <th scope="col" className="eyebrow w-[22%] py-2 text-right font-normal">Owed</th>
+              <th scope="col" className="eyebrow w-[16%] py-2 text-right font-normal">APR</th>
+              <th scope="col" className="eyebrow w-[18%] py-2 text-right font-normal">Min</th>
+              <th scope="col" className="sr-only w-[6%]">Remove</th>
             </tr>
           </thead>
           <tbody>
