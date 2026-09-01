@@ -21,7 +21,10 @@ jobs:
           python-version: "3.12"
       - uses: supabase/setup-cli@v1
         with:
-          version: 2.22.6
+          # Must match the CLI that generated backend/supabase/config.toml.
+          # An older pin fails with 'invalid keys' on config written by a
+          # newer CLI, which is exactly how this pin broke the build once.
+          version: 2.116.0
       - name: Start Supabase
         run: supabase start
       - name: Grant the app role a login
