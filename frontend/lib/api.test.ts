@@ -1,5 +1,11 @@
-import { describe, expect, test } from "vitest";
-import { buildRequest, currentStartMonth, type DebtDraft } from "./api";
+import { describe, expect, test, vi } from "vitest";
+import {
+  apiBase,
+  buildRequest,
+  currentStartMonth,
+  DEFAULT_API_BASE,
+  type DebtDraft,
+} from "./api";
 
 const DRAFTS: DebtDraft[] = [
   { id: "visa", name: "Visa Signature", balance: "6120.00", apr: "24.99", minimum_payment: "122.40" },
@@ -57,5 +63,52 @@ describe("buildRequest", () => {
     const body = buildRequest(DRAFTS, "200.00", new Date(2026, 8, 1));
     expect(Object.keys(body).sort()).toEqual(["debts", "extra_monthly_payment", "start_month"]);
     expect(Object.keys(body.debts[0]).sort()).toEqual(["apr", "balance", "id", "minimum_payment", "name"]);
+  });
+});
+
+describe("apiBase", () => {
+  test("uses the supplied origin", () => {
+    expect(apiBase("https://api.example.com")).toBe("https://api.example.com");
+  });
+
+  test("falls back when the variable is unset", () => {
+    // stubEnv, not `apiBase(undefined)`: passing undefined ACTIVATES the
+    // default parameter, which reads the real process.env — so this passed only
+    // by luck, and failed for anyone with NEXT_PUBLIC_API_BASE_URL exported in
+    // their shell.
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", undefined);
+    expect(apiBase()).toBe(DEFAULT_API_BASE);
+    vi.unstubAllEnvs();
+  });
+
+  test("reads the environment when no argument is given", () => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://from-env.example.com/");
+    expect(apiBase()).toBe("https://from-env.example.com");
+    vi.unstubAllEnvs();
+  });
+
+  test("falls back for a lone slash", () => {
+    // Truthy, so `||` lets it through; stripping the slash leaves "".
+    expect(apiBase("/")).toBe(DEFAULT_API_BASE);
+    expect(apiBase("///")).toBe(DEFAULT_API_BASE);
+  });
+
+  test("falls back when the variable is an empty or blank string", () => {
+    // `??` would let these through, and every request would then resolve as a
+    // relative path -- silently wrong anywhere the page is not served from the
+    // API's own origin, and failing as a confusing 404 rather than as missing
+    // configuration. An empty value in a deploy dashboard is trivially easy.
+    expect(apiBase("")).toBe(DEFAULT_API_BASE);
+    expect(apiBase("   ")).toBe(DEFAULT_API_BASE);
+  });
+
+  test("strips trailing slashes so paths do not double up", () => {
+    // Paths are concatenated as `${BASE}${path}` where path starts with "/".
+    expect(apiBase("https://api.example.com/")).toBe("https://api.example.com");
+    expect(apiBase("https://api.example.com///")).toBe("https://api.example.com");
+  });
+
+  test("leaves an internal path segment alone", () => {
+    expect(apiBase("https://example.com/api/")).toBe("https://example.com/api");
   });
 });

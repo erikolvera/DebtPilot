@@ -23,7 +23,31 @@ export type DebtDraft = {
   minimum_payment: string;
 };
 
-const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+export const DEFAULT_API_BASE = "http://127.0.0.1:8000";
+
+/**
+ * The API origin, normalised.
+ *
+ * `??` alone is not enough. An env var set to an empty string — trivially easy
+ * to do in a Vercel dashboard — IS a string, so it passes the nullish check and
+ * every request becomes a relative path: silently wrong anywhere the page is
+ * not served from the API's own origin, and it fails as a confusing 404 rather
+ * than a missing-configuration error. `||` catches it. The trailing-slash strip
+ * is the other half: `https://api.example.com/` would otherwise produce
+ * `https://api.example.com//v1/payoff-plans`.
+ */
+export function apiBase(
+  raw: string | undefined = process.env.NEXT_PUBLIC_API_BASE_URL,
+): string {
+  const trimmed = raw?.trim();
+  // The second fallback is not redundant. A lone "/" is truthy, so it survives
+  // the first one, and stripping its trailing slash leaves "" -- landing on the
+  // exact relative-path failure this function exists to prevent.
+  const base = (trimmed || DEFAULT_API_BASE).replace(/\/+$/, "");
+  return base || DEFAULT_API_BASE;
+}
+
+const BASE = apiBase();
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
