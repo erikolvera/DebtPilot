@@ -232,4 +232,22 @@ believing it hands an abuser an unlimited supply of buckets.
 - [ ] Supabase Postgres + auth
 - [x] AI guidance — `POST /v1/payoff-plans/explain`
 - [ ] AI follow-up questions (`POST /ask`)
-- [ ] Next.js frontend
+- [x] Next.js frontend — anonymous calculator
+
+## Running the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Serves the calculator at `http://localhost:3000`. It talks directly to the
+stateless `POST /v1/payoff-plans` and `POST /v1/payoff-plans/explain`
+endpoints — no sign-in required — so the backend above needs to be running
+too.
+
+`NEXT_PUBLIC_API_BASE_URL` points it at the API; copy `frontend/.env.example`
+to `frontend/.env.local` to override the `http://127.0.0.1:8000` default (see
+`.env.example` for what a deployed preview needs on the backend's
+`ALLOWED_ORIGINS`).
