@@ -69,8 +69,22 @@ export function wedgePath(
     parts.push(`L ${x(point.month_number).toFixed(1)} ${y(Number(point.remaining_balance)).toFixed(1)}`);
   }
   const last = totals[totals.length - 1];
-  parts.push(`L ${x(last.month_number).toFixed(1)} ${y(Number(last.remaining_balance)).toFixed(1)}`);
-  parts.push(`L ${x(last.month_number).toFixed(1)} ${lane.height.toFixed(1)}`);
+  const lastBalance = Number(last.remaining_balance);
+  parts.push(`L ${x(last.month_number).toFixed(1)} ${y(lastBalance).toFixed(1)}`);
+
+  // A series that ends with a balance still owing did not end: the SIMULATION
+  // stopped, the debt did not. The engine exits as soon as it has proved a
+  // portfolio hopeless, which for an all-underwater portfolio is after a single
+  // month -- so drawing only the simulated window renders a debt that never
+  // clears as a stub that clears immediately. Precisely backwards, on the one
+  // chart this product exists to draw. Carry the last known balance out to the
+  // axis edge instead. A scenario that pays off ends at exactly 0 and is
+  // unaffected, because balances are quantized to cents with no epsilon.
+  const endsOwing = lastBalance > 0;
+  const endX = endsOwing ? lane.width : x(last.month_number);
+  if (endsOwing) parts.push(`L ${endX.toFixed(1)} ${y(lastBalance).toFixed(1)}`);
+
+  parts.push(`L ${endX.toFixed(1)} ${lane.height.toFixed(1)}`);
   parts.push(`L ${x(0).toFixed(1)} ${lane.height.toFixed(1)}`);
   parts.push("Z");
   return parts.join(" ");
