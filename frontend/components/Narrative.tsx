@@ -22,7 +22,21 @@ export function Narrative({ debts, extra, ready }: Props) {
   const [failed, setFailed] = useState(false);
   const askedOnce = useRef(false);
 
+  // Props are read through a ref so `ask` has a STABLE identity. If `ask`
+  // depended on `debts`/`extra`, the mount effect below would depend on them
+  // too, and any edit while the one auto-request is in flight — the normal
+  // case, since generation takes seconds and the user is still typing — would
+  // run the previous cleanup (aborting the live request), re-enter, find
+  // `askedOnce` already set, and return WITHOUT starting a replacement.
+  // `loading` would then stay true forever: the skeleton never resolves and
+  // "Explain again" stays disabled, with no recovery short of a remount.
+  const latest = useRef({ debts, extra });
+  useEffect(() => {
+    latest.current = { debts, extra };
+  });
+
   const ask = useCallback(() => {
+    const { debts, extra } = latest.current;
     const controller = new AbortController();
     setLoading(true);
     setFailed(false);
@@ -40,7 +54,7 @@ export function Narrative({ debts, extra, ready }: Props) {
         setFailed(true);
       });
     return () => controller.abort();
-  }, [debts, extra]);
+  }, []);
 
   // Once per session, when the first plan arrives. Firing on the debounced
   // change stream would exhaust the endpoint's ten-per-hour limit inside a

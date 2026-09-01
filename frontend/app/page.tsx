@@ -19,6 +19,11 @@ export default function Page() {
   // Restore after mount, never during render: localStorage does not exist on
   // the server, and reading it during render would mismatch hydration.
   useEffect(() => {
+    // localStorage cannot be read during render without a hydration mismatch,
+    // and the alternatives (lazy initializer, useSyncExternalStore with a
+    // cached snapshot) are respectively wrong and far more machinery than one
+    // extra render on mount is worth.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPortfolio(loadPortfolio(browserStorage(), seedPortfolio()));
     setRestored(true);
   }, []);

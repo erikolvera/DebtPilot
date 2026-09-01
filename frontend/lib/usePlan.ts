@@ -38,26 +38,32 @@ function describe(cause: unknown): string {
  */
 export function usePlan(debts: DebtDraft[], extra: string): PlanState {
   const [plan, setPlan] = useState<PayoffPlanResponse | null>(null);
-  const [pending, setPending] = useState(true);
+  const [inFlight, setInFlight] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // `pending` is derived, not stored: a portfolio that is mid-edit or empty has
+  // no request to wait for, so the bail branch below needs no state write at all.
+  const pending = inFlight && isSendable(debts, extra);
 
   useEffect(() => {
     if (!isSendable(debts, extra)) {
       // Mid-edit or empty. Keep the last good plan on screen; there is nothing
       // useful to ask for and a 422 would read as a server fault.
-      setPending(false);
       return;
     }
 
     const controller = new AbortController();
-    setPending(true);
+    // A new sendable value means a new request is about to start, so the
+    // loading flag must flip back on synchronously here — there is no
+    // external event to react to later that would do it instead.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setInFlight(true);
 
     const timer = setTimeout(() => {
       fetchPlan(buildRequest(debts, extra), controller.signal)
         .then((next) => {
           setPlan(next);
           setError(null);
-          setPending(false);
+          setInFlight(false);
         })
         .catch((cause: unknown) => {
           // An abort means a newer request is already in flight. Leaving
@@ -67,7 +73,7 @@ export function usePlan(debts: DebtDraft[], extra: string): PlanState {
           // slider.
           if (isAbort(cause)) return;
           setError(describe(cause));
-          setPending(false);
+          setInFlight(false);
         });
     }, DEBOUNCE_MS);
 
