@@ -6,11 +6,12 @@ import { ExtraPayment } from "@/components/ExtraPayment";
 import { PlanSteps } from "@/components/PlanSteps";
 import { useFinancialProfile } from "@/lib/useFinancialProfile";
 import { useReport } from "@/lib/useReport";
+import { affordabilityPresentation } from "@/lib/reportState";
 import { isFinancialReportSendable } from "@/lib/validate";
 
 export default function DebtsPage() {
   const { profile, ready, setDebts, setExtra, saveNow } = useFinancialProfile();
-  const { report } = useReport(
+  const { report, pending, stale, error } = useReport(
     profile.incomes,
     profile.expenses,
     profile.debts,
@@ -22,6 +23,13 @@ export default function DebtsPage() {
     profile.debts,
     profile.extra,
   );
+  const affordability = affordabilityPresentation({
+    sendable,
+    pending,
+    stale,
+    error,
+  });
+  const currentReport = affordability.showCurrentReport ? report : null;
 
   if (!ready) {
     return <main className="mx-auto max-w-5xl px-5 py-16 text-ink-soft">Loading your plan…</main>;
@@ -46,9 +54,10 @@ export default function DebtsPage() {
         <ExtraPayment
           value={profile.extra}
           onChange={setExtra}
-          maximumAffordable={report?.cash_flow.maximum_affordable_extra_payment}
-          plannedExtra={report?.debt_payment_budget.planned_extra_monthly_payment}
-          isAffordable={report?.debt_payment_budget.is_affordable}
+          maximumAffordable={currentReport?.cash_flow.maximum_affordable_extra_payment}
+          plannedExtra={currentReport?.debt_payment_budget.planned_extra_monthly_payment}
+          isAffordable={currentReport?.debt_payment_budget.is_affordable}
+          affordabilityStatus={affordability.status}
         />
       </div>
 

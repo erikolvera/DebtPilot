@@ -1,6 +1,12 @@
 import { describe, expect, test } from "vitest";
 import type { DebtDraft } from "./api";
-import { debtErrors, extraError, isSendable } from "./validate";
+import {
+  debtErrors,
+  extraError,
+  isFinancialReportSendable,
+  isSendable,
+  reportExtraError,
+} from "./validate";
 
 const OK: DebtDraft = {
   id: "a", name: "Visa", balance: "6120.00", apr: "24.99", minimum_payment: "122.40",
@@ -59,6 +65,24 @@ describe("extraError", () => {
   test("rejects an empty or malformed amount", () => {
     expect(extraError("")).not.toBeNull();
     expect(extraError("-1")).not.toBeNull();
+  });
+
+  test("keeps the debt-only endpoint ceiling", () => {
+    expect(extraError("99999999.99")).toBeNull();
+    expect(extraError("100000000.00")).not.toBeNull();
+  });
+});
+
+describe("reportExtraError", () => {
+  test("accepts the report-wide ceiling without widening individual fields", () => {
+    expect(reportExtraError("21666666664.50")).toBeNull();
+    expect(reportExtraError("21666666664.51")).not.toBeNull();
+    expect(debtErrors({ ...OK, balance: "100000000.00" }).balance).toBeDefined();
+  });
+
+  test("is used by financial-report sendability", () => {
+    expect(isFinancialReportSendable([], [], [], "21666666664.50")).toBe(true);
+    expect(isFinancialReportSendable([], [], [], "21666666664.51")).toBe(false);
   });
 });
 

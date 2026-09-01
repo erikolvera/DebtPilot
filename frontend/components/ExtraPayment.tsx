@@ -2,7 +2,7 @@
 
 import { EXTRA_SLIDER_MAX } from "@/lib/seed";
 import { money } from "@/lib/format";
-import { extraError } from "@/lib/validate";
+import { reportExtraError } from "@/lib/validate";
 
 type Props = {
   value: string;
@@ -10,10 +10,18 @@ type Props = {
   maximumAffordable?: string;
   plannedExtra?: string;
   isAffordable?: boolean;
+  affordabilityStatus?: string | null;
 };
 
-export function ExtraPayment({ value, onChange, maximumAffordable, plannedExtra, isAffordable }: Props) {
-  const error = extraError(value);
+export function ExtraPayment({
+  value,
+  onChange,
+  maximumAffordable,
+  plannedExtra,
+  isAffordable,
+  affordabilityStatus,
+}: Props) {
+  const error = reportExtraError(value);
   const invalid = error !== null;
   // The one place a money value becomes a number: a range input's value is
   // numeric by nature. It is converted straight back to a fixed-2 string and
@@ -70,6 +78,11 @@ export function ExtraPayment({ value, onChange, maximumAffordable, plannedExtra,
           {isAffordable === false && plannedExtra !== undefined && (
             <> The payoff plan uses {money(plannedExtra)} instead.</>
           )}
+        </p>
+      )}
+      {maximumAffordable === undefined && affordabilityStatus && (
+        <p role="status" className="mt-4 rounded-xl bg-white/65 px-3 py-2 text-xs text-ink-soft">
+          {affordabilityStatus}
         </p>
       )}
     </section>

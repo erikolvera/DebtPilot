@@ -9,6 +9,7 @@ import { Recommendations } from "@/components/Recommendations";
 import { ScenarioSummary } from "@/components/ScenarioSummary";
 import { delta, money } from "@/lib/format";
 import { effectiveStrategy } from "@/lib/payoffGuidance";
+import { emptyReportCopy } from "@/lib/reportState";
 import { useFinancialProfile } from "@/lib/useFinancialProfile";
 import { useReport } from "@/lib/useReport";
 
@@ -27,6 +28,7 @@ export default function ReportPage() {
     guidance?.recommended_strategy ?? null,
   );
   const actionsDisabled = pending || stale;
+  const emptyState = emptyReportCopy(pending, error);
 
   const nameFor = useMemo(() => {
     const names = new Map(
@@ -67,20 +69,16 @@ export default function ReportPage() {
         </Link>
       </header>
 
-      {error !== null && (
+      {error !== null && !pending && (
         <p role="status" className="mt-8 border-l-2 border-snowball pl-3 text-sm">
-          {error}
+          {error.message}
         </p>
       )}
 
       {report === null ? (
         <section className="panel mt-12">
-          <h2 className="font-display text-2xl font-semibold">Your report needs complete entries.</h2>
-          <p className="mt-3 text-ink-soft">
-            {pending
-              ? "Calculating your report…"
-              : "Return to the planner and fix the highlighted fields."}
-          </p>
+          <h2 className="font-display text-2xl font-semibold">{emptyState.title}</h2>
+          <p className="mt-3 text-ink-soft">{emptyState.detail}</p>
           <Link href="/plan/cash-flow" className="mt-6 inline-block font-semibold">
             Return to planner →
           </Link>

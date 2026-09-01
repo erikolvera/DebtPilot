@@ -67,8 +67,15 @@ Money = Annotated[
 # Keep extreme but valid Decimal inputs from overwhelming the simulator.
 MONEY_MAX = Decimal("99999999.99")
 
-
 MAX_DEBTS_PER_USER = 20
+MAX_INCOMES_PER_REPORT = 50
+
+# A report can aggregate more cash than any one money field: weekly is the
+# highest-frequency income, and the request accepts 50 such rows. Keep the
+# requested-extra ceiling aligned with that valid aggregate so every guidance
+# option can be sent back to the same endpoint. This is
+# MONEY_MAX * 52 pay periods * 50 incomes / 12 months, rounded to cents.
+MAX_REPORT_EXTRA_PAYMENT = Decimal("21666666664.50")
 
 
 def _non_blank(value: Any) -> Any:
@@ -188,10 +195,12 @@ class FinancialReportDebtIn(DebtIn):
 class FinancialReportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    incomes: list[IncomeIn] = Field(max_length=50)
+    incomes: list[IncomeIn] = Field(max_length=MAX_INCOMES_PER_REPORT)
     expenses: list[ExpenseIn] = Field(max_length=100)
     debts: list[FinancialReportDebtIn] = Field(max_length=MAX_DEBTS_PER_USER)
-    requested_extra_monthly_payment: Money = Field(ge=0, le=MONEY_MAX)
+    requested_extra_monthly_payment: Money = Field(
+        ge=0, le=MAX_REPORT_EXTRA_PAYMENT
+    )
     start_month: str = Field(pattern=MONTH_PATTERN)
 
     @model_validator(mode="after")

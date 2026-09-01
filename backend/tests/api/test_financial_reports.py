@@ -153,6 +153,42 @@ def test_no_debt_returns_a_cash_report_without_a_payoff_plan(client):
     ]
 
 
+def test_zero_balance_debt_minimum_does_not_reduce_cash_flow(client):
+    body = client.post(
+        "/v1/financial-reports",
+        json=report_body(
+            incomes=[],
+            expenses=[],
+            debts=[
+                {
+                    "id": "paid",
+                    "name": "Paid-off card",
+                    "type": "credit_card",
+                    "balance": "0.00",
+                    "apr": "20.00",
+                    "minimum_payment": "100.00",
+                }
+            ],
+            requested_extra_monthly_payment="0.00",
+        ),
+    ).json()
+
+    assert body["cash_flow"] == {
+        "total_monthly_income": "0.00",
+        "total_monthly_expenses": "0.00",
+        "total_minimum_debt_payments": "0.00",
+        "available_monthly_cash_flow": "0.00",
+        "shortfall": "0.00",
+        "maximum_affordable_extra_payment": "0.00",
+        "status": "break_even",
+    }
+    assert body["payoff_plan"] is None
+    assert body["payoff_guidance"] is None
+    assert [item["code"] for item in body["recommendations"]] == [
+        "build_cash_reserve"
+    ]
+
+
 def test_supported_debt_types_are_accepted_with_an_estimate_disclosure(client):
     debt = report_body()["debts"][0]
     debt["type"] = "student_loan"
@@ -339,6 +375,43 @@ def test_half_cent_split_rounds_up_and_duplicate_amounts_are_removed(client):
         ("current", "100.00"),
         ("maximum", "100.01"),
     ]
+
+
+def test_generated_maximum_payment_round_trips_at_aggregate_income_ceiling(client):
+    debt = report_body()["debts"][0]
+    debt["minimum_payment"] = "0.00"
+    request = report_body(
+        incomes=[
+            {
+                "id": f"income-{index}",
+                "name": f"Weekly income {index}",
+                "amount": "99999999.99",
+                "frequency": "weekly",
+            }
+            for index in range(50)
+        ],
+        expenses=[],
+        debts=[debt],
+        requested_extra_monthly_payment="0.00",
+    )
+
+    first = client.post("/v1/financial-reports", json=request)
+    assert first.status_code == 200
+    maximum = first.json()["payoff_guidance"]["payment_options"][-1]
+    assert maximum["kind"] == "maximum"
+    assert maximum["extra_monthly_payment"] == "21666666664.50"
+
+    request["requested_extra_monthly_payment"] = maximum["extra_monthly_payment"]
+    replay = client.post("/v1/financial-reports", json=request)
+
+    assert replay.status_code == 200
+    assert replay.json()["debt_payment_budget"] == {
+        "requested_extra_monthly_payment": "21666666664.50",
+        "planned_extra_monthly_payment": "21666666664.50",
+        "unallocated_cash_flow": "0.00",
+        "extra_payment_gap": "0.00",
+        "is_affordable": True,
+    }
 
 
 def test_never_payoff_comparisons_have_null_savings(client):

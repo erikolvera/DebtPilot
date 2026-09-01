@@ -19,6 +19,9 @@ export type FieldErrors = Partial<Record<keyof DebtDraft, string>>;
 const DECIMAL = /^\d+(\.\d{1,2})?$/;
 
 const MONEY_MAX = 99999999.99;
+// A financial report may combine up to 50 normalized income rows. Its extra
+// payment therefore has a wider contract than any individual money field.
+const REPORT_EXTRA_MAX = 21666666664.50;
 const APR_MAX = 999.99;
 /** Mirrors the server's MAX_DEBTS_PER_USER. */
 export const MAX_DEBTS = 20;
@@ -67,6 +70,10 @@ export function extraError(extra: string): string | null {
   return moneyError(extra, MONEY_MAX, "Extra payment") ?? null;
 }
 
+export function reportExtraError(extra: string): string | null {
+  return moneyError(extra, REPORT_EXTRA_MAX, "Extra payment") ?? null;
+}
+
 /** Whether this portfolio is worth sending. */
 export function isSendable(debts: DebtDraft[], extra: string): boolean {
   if (debts.length === 0 || debts.length > MAX_DEBTS) return false;
@@ -108,7 +115,7 @@ export function isFinancialReportSendable(
   if (incomes.length > 50 || expenses.length > 100 || debts.length > MAX_DEBTS) {
     return false;
   }
-  if (extraError(extra) !== null) return false;
+  if (reportExtraError(extra) !== null) return false;
   if (!idsAreUnique(incomes) || !idsAreUnique(expenses) || !idsAreUnique(debts)) {
     return false;
   }

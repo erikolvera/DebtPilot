@@ -128,7 +128,7 @@ def create_financial_report(
     cash_flow = analyze_cash_flow(
         [monthly_income_amount(row.amount, row.frequency) for row in request.incomes],
         [row.monthly_amount for row in request.expenses],
-        [debt.minimum_payment for debt in debts],
+        [debt.minimum_payment for debt in debts if debt.balance > ZERO],
     )
     allocation = allocate_extra_payment(
         request.requested_extra_monthly_payment, cash_flow

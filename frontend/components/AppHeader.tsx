@@ -19,7 +19,7 @@ export function AppHeader() {
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary text-sm text-white shadow-md shadow-primary/20" aria-hidden="true">
             D
           </span>
-          DebtPilot
+          <span className="max-[399px]:sr-only">DebtPilot</span>
         </Link>
         <nav aria-label="Primary navigation" className="flex items-center gap-1 text-sm">
           {LINKS.map(([href, label]) => {
