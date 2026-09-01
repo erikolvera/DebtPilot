@@ -65,15 +65,23 @@ export function IncomeTable({ incomes, onChange }: Props) {
   });
 
   return (
-    <section aria-labelledby="income-heading">
-      <h2 id="income-heading" className="eyebrow">
-        Monthly income
-      </h2>
+    <section aria-labelledby="income-heading" className="panel">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="eyebrow text-primary">Cash coming in</p>
+          <h2 id="income-heading" className="mt-2 font-display text-2xl font-semibold">
+            Monthly income
+          </h2>
+        </div>
+        <span className="tnum rounded-full bg-mint px-3 py-1 text-xs text-[#176347]">
+          {incomes.length} {incomes.length === 1 ? "source" : "sources"}
+        </span>
+      </div>
 
       {incomes.length === 0 ? (
         <p className="mt-4 text-sm text-ink-soft">No income sources added yet.</p>
       ) : (
-        <table className="mt-4 w-full table-fixed border-collapse">
+        <table className="mt-6 w-full table-fixed border-collapse">
           <caption className="sr-only">
             Your monthly income sources. Edit any value to update the report.
           </caption>
@@ -103,7 +111,7 @@ export function IncomeTable({ incomes, onChange }: Props) {
                         if (element) nameInputs.current.set(income.id, element);
                         else nameInputs.current.delete(income.id);
                       }}
-                      className="w-full rounded bg-transparent px-2 py-1.5 text-sm outline-none focus:bg-ink/5"
+                      className="w-full rounded-lg bg-transparent px-2 py-2 text-sm outline-none hover:bg-primary/5 focus:bg-primary/5"
                       value={income.name}
                       onChange={(event) => update(income.id, "name", event.target.value)}
                       aria-label="Income source name"
@@ -114,7 +122,7 @@ export function IncomeTable({ incomes, onChange }: Props) {
                   </th>
                   <td className="py-1">
                     <input
-                      className="w-full rounded bg-transparent px-1 py-1.5 text-right font-mono text-xs tabular-nums outline-none focus:bg-ink/5 sm:px-2 sm:text-sm"
+                      className="w-full rounded-lg bg-transparent px-1 py-2 text-right font-mono text-xs tabular-nums outline-none hover:bg-primary/5 focus:bg-primary/5 sm:px-2 sm:text-sm"
                       type="text"
                       inputMode="decimal"
                       value={income.monthly_amount}
@@ -131,7 +139,7 @@ export function IncomeTable({ incomes, onChange }: Props) {
                     <button
                       type="button"
                       onClick={() => remove(income.id)}
-                      className="rounded px-2 py-1 text-ink-soft hover:text-ink"
+                      className="rounded-full px-2 py-1 text-ink-soft hover:bg-coral-soft hover:text-danger"
                       aria-label={`Remove ${income.name || "this income source"}`}
                     >
                       ×
@@ -145,7 +153,7 @@ export function IncomeTable({ incomes, onChange }: Props) {
       )}
 
       {problems.length > 0 && (
-        <ul aria-live="polite" className="mt-3 space-y-1 text-xs text-ink-soft">
+        <ul aria-live="polite" className="mt-3 space-y-1 text-xs text-danger">
           {problems.map((problem) => (
             <li id={problem.id} key={problem.id}>
               {problem.message}
@@ -158,7 +166,7 @@ export function IncomeTable({ incomes, onChange }: Props) {
         type="button"
         onClick={add}
         disabled={incomes.length >= MAX_INCOMES}
-        className="mt-4 rounded border border-rule px-3 py-1.5 text-sm hover:bg-ink/5 disabled:opacity-40"
+        className="secondary-button mt-5 px-4 py-2 text-sm disabled:opacity-40"
       >
         Add income
       </button>

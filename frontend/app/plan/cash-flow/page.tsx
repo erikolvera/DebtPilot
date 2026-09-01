@@ -17,7 +17,7 @@ export default function CashFlowPage() {
     <main className="mx-auto max-w-5xl px-5 py-12 sm:px-8 lg:px-10 lg:py-16">
       <PlanSteps current={1} />
       <header className="mt-8 max-w-3xl">
-        <p className="eyebrow">Step one</p>
+        <p className="eyebrow text-primary">Step one</p>
         <h1 className="mt-3 font-display text-4xl font-bold tracking-tight sm:text-6xl">
           Start with your monthly reality.
         </h1>
@@ -40,7 +40,7 @@ export default function CashFlowPage() {
         <Link
           href="/plan/debts"
           onClick={saveNow}
-          className="rounded-full bg-ink px-6 py-3 font-semibold text-paper hover:opacity-85"
+          className="primary-button px-6"
         >
           Continue to debts →
         </Link>

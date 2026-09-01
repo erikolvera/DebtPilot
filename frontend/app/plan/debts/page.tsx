@@ -31,7 +31,7 @@ export default function DebtsPage() {
     <main className="mx-auto max-w-5xl px-5 py-12 sm:px-8 lg:px-10 lg:py-16">
       <PlanSteps current={2} />
       <header className="mt-8 max-w-3xl">
-        <p className="eyebrow">Step two</p>
+        <p className="eyebrow text-primary">Step two</p>
         <h1 className="mt-3 font-display text-4xl font-bold tracking-tight sm:text-6xl">
           Add the debts you want to tackle.
         </h1>
@@ -56,7 +56,7 @@ export default function DebtsPage() {
         <Link
           href="/plan/cash-flow"
           onClick={saveNow}
-          className="font-semibold text-ink-soft hover:text-ink"
+          className="secondary-button"
         >
           ← Back to cash flow
         </Link>
@@ -64,7 +64,7 @@ export default function DebtsPage() {
           <Link
             href="/report"
             onClick={saveNow}
-            className="rounded-full bg-ink px-6 py-3 font-semibold text-paper hover:opacity-85"
+            className="primary-button px-6"
           >
             See my report →
           </Link>

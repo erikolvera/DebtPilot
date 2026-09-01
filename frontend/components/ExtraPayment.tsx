@@ -21,15 +21,16 @@ export function ExtraPayment({ value, onChange, maximumAffordable, plannedExtra,
   const sliderValue = invalid ? 0 : Math.min(Number(value), EXTRA_SLIDER_MAX);
 
   return (
-    <section aria-labelledby="extra-heading" className="mt-10">
-      <h2 id="extra-heading" className="eyebrow">
+    <section aria-labelledby="extra-heading" className="panel panel-warm">
+      <p className="eyebrow text-[#85630d]">Speed up the plan</p>
+      <h2 id="extra-heading" className="mt-2 font-display text-2xl font-semibold">
         Extra toward debt
       </h2>
 
       <div className="mt-3 flex items-baseline gap-2">
-        <span className="tnum text-2xl text-ink-soft">$</span>
+        <span className="tnum text-2xl text-[#85630d]">$</span>
         <input
-          className="tnum w-32 rounded bg-transparent text-3xl outline-none focus:bg-ink/5"
+          className="tnum w-40 rounded-xl border border-[#ead690] bg-white/70 px-3 py-2 text-3xl outline-none focus:border-primary"
           type="text"
           inputMode="decimal"
           value={value}
@@ -40,7 +41,7 @@ export function ExtraPayment({ value, onChange, maximumAffordable, plannedExtra,
       </div>
 
       <input
-        className="mt-4 w-full accent-[var(--avalanche)]"
+        className="mt-6 w-full accent-[var(--primary)]"
         type="range"
         min={0}
         max={EXTRA_SLIDER_MAX}
@@ -50,14 +51,14 @@ export function ExtraPayment({ value, onChange, maximumAffordable, plannedExtra,
         aria-label="Extra payment each month"
       />
 
-      {error !== null && <p className="mt-2 text-xs text-ink-soft">{error}</p>}
+      {error !== null && <p className="mt-2 text-xs text-danger">{error}</p>}
 
       <p className="mt-2 text-xs text-ink-soft">
         On top of every minimum. The report never models more than your
         available monthly cash.
       </p>
       {maximumAffordable !== undefined && (
-        <p className="mt-2 text-xs text-ink-soft">
+        <p className={`mt-4 rounded-xl px-3 py-2 text-xs ${isAffordable === false ? "bg-coral-soft text-danger" : "bg-white/65 text-ink-soft"}`}>
           Budget supports up to {money(maximumAffordable)}.
           {isAffordable === false && plannedExtra !== undefined && (
             <> The payoff plan uses {money(plannedExtra)} instead.</>

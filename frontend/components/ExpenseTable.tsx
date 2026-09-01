@@ -87,15 +87,23 @@ export function ExpenseTable({ expenses, onChange }: Props) {
   });
 
   return (
-    <section aria-labelledby="expenses-heading">
-      <h2 id="expenses-heading" className="eyebrow">
-        Monthly expenses
-      </h2>
+    <section aria-labelledby="expenses-heading" className="panel">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="eyebrow text-snowball">Cash going out</p>
+          <h2 id="expenses-heading" className="mt-2 font-display text-2xl font-semibold">
+            Monthly expenses
+          </h2>
+        </div>
+        <span className="tnum rounded-full bg-coral-soft px-3 py-1 text-xs text-danger">
+          {expenses.length} {expenses.length === 1 ? "expense" : "expenses"}
+        </span>
+      </div>
 
       {expenses.length === 0 ? (
         <p className="mt-4 text-sm text-ink-soft">No expenses added yet.</p>
       ) : (
-        <table className="mt-4 w-full table-fixed border-collapse">
+        <table className="mt-6 w-full table-fixed border-collapse">
           <caption className="sr-only">
             Your monthly expenses. Edit any value to update the report.
           </caption>
@@ -128,7 +136,7 @@ export function ExpenseTable({ expenses, onChange }: Props) {
                         if (element) nameInputs.current.set(expense.id, element);
                         else nameInputs.current.delete(expense.id);
                       }}
-                      className="w-full rounded bg-transparent px-2 py-1.5 text-sm outline-none focus:bg-ink/5"
+                      className="w-full rounded-lg bg-transparent px-2 py-2 text-sm outline-none hover:bg-primary/5 focus:bg-primary/5"
                       value={expense.name}
                       onChange={(event) => update(expense.id, "name", event.target.value)}
                       aria-label="Expense name"
@@ -139,7 +147,7 @@ export function ExpenseTable({ expenses, onChange }: Props) {
                   </th>
                   <td className="py-1">
                     <select
-                      className="w-full rounded bg-transparent px-1 py-1.5 text-xs outline-none focus:bg-ink/5 sm:px-2 sm:text-sm"
+                      className="w-full rounded-lg bg-transparent px-1 py-2 text-xs outline-none hover:bg-primary/5 focus:bg-primary/5 sm:px-2 sm:text-sm"
                       value={expense.category}
                       onChange={(event) => update(expense.id, "category", event.target.value)}
                       aria-label={`${label} — category`}
@@ -157,7 +165,7 @@ export function ExpenseTable({ expenses, onChange }: Props) {
                   </td>
                   <td className="py-1">
                     <input
-                      className="w-full rounded bg-transparent px-1 py-1.5 text-right font-mono text-xs tabular-nums outline-none focus:bg-ink/5 sm:px-2 sm:text-sm"
+                      className="w-full rounded-lg bg-transparent px-1 py-2 text-right font-mono text-xs tabular-nums outline-none hover:bg-primary/5 focus:bg-primary/5 sm:px-2 sm:text-sm"
                       type="text"
                       inputMode="decimal"
                       value={expense.monthly_amount}
@@ -174,7 +182,7 @@ export function ExpenseTable({ expenses, onChange }: Props) {
                     <button
                       type="button"
                       onClick={() => remove(expense.id)}
-                      className="rounded px-2 py-1 text-ink-soft hover:text-ink"
+                      className="rounded-full px-2 py-1 text-ink-soft hover:bg-coral-soft hover:text-danger"
                       aria-label={`Remove ${expense.name || "this expense"}`}
                     >
                       ×
@@ -188,7 +196,7 @@ export function ExpenseTable({ expenses, onChange }: Props) {
       )}
 
       {problems.length > 0 && (
-        <ul aria-live="polite" className="mt-3 space-y-1 text-xs text-ink-soft">
+        <ul aria-live="polite" className="mt-3 space-y-1 text-xs text-danger">
           {problems.map((problem) => (
             <li id={problem.id} key={problem.id}>
               {problem.message}
@@ -201,7 +209,7 @@ export function ExpenseTable({ expenses, onChange }: Props) {
         type="button"
         onClick={add}
         disabled={expenses.length >= MAX_EXPENSES}
-        className="mt-4 rounded border border-rule px-3 py-1.5 text-sm hover:bg-ink/5 disabled:opacity-40"
+        className="secondary-button mt-5 px-4 py-2 text-sm disabled:opacity-40"
       >
         Add expense
       </button>

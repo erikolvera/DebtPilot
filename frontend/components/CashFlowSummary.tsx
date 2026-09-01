@@ -13,18 +13,21 @@ type Props = {
   stale: boolean;
 };
 
-const STATUS: Record<Status, { label: string; border: string }> = {
+const STATUS: Record<Status, { label: string; tone: string; dot: string }> = {
   deficit: {
     label: "Monthly budget has a shortfall",
-    border: "border-snowball",
+    tone: "bg-coral-soft text-danger",
+    dot: "bg-snowball",
   },
   break_even: {
     label: "Monthly budget breaks even",
-    border: "border-baseline",
+    tone: "bg-[#f0f2f7] text-ink",
+    dot: "bg-baseline",
   },
   surplus: {
     label: "Monthly budget has a surplus",
-    border: "border-avalanche",
+    tone: "bg-mint text-[#176347]",
+    dot: "bg-avalanche",
   },
 };
 
@@ -49,26 +52,28 @@ export function CashFlowSummary({
   ];
 
   return (
-    <section aria-labelledby="cash-flow-heading">
-      <h2 id="cash-flow-heading" className="eyebrow">
+    <section aria-labelledby="cash-flow-heading" className="panel">
+      <p className="eyebrow text-primary">Monthly overview</p>
+      <h2 id="cash-flow-heading" className="mt-2 font-display text-2xl font-semibold">
         Cash flow
       </h2>
 
       <p
         role="status"
-        className={`mt-4 border-l-2 ${state.border} pl-3 text-sm font-medium`}
+        className={`mt-5 inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold ${state.tone}`}
       >
+        <span className={`h-2 w-2 rounded-full ${state.dot}`} aria-hidden="true" />
         {state.label}
         {stale && (
           <span className="font-normal text-ink-soft"> · Figures reflect earlier valid entries</span>
         )}
       </p>
 
-      <dl className="mt-5 divide-y divide-rule/60 border-y border-rule text-sm">
+      <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex items-baseline justify-between gap-6 py-3">
+          <div key={label} className="rounded-2xl bg-[#f7f8ff] p-4">
             <dt className="text-ink-soft">{label}</dt>
-            <dd className="tnum text-right">{money(value)}</dd>
+            <dd className="tnum mt-2 text-xl font-semibold">{money(value)}</dd>
           </div>
         ))}
       </dl>

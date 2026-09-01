@@ -12,9 +12,15 @@ type Props = {
 
 export function ScenarioSummary({ scenario, label, accent, nameFor, note }: Props) {
   const figures = scenarioFigures(scenario);
+  const tone =
+    label === "Avalanche"
+      ? "bg-mint"
+      : label === "Snowball"
+        ? "bg-coral-soft"
+        : "bg-[#f1f3f8]";
 
   return (
-    <div className="border-t border-rule pt-4">
+    <div className={`rounded-2xl p-5 ${tone}`}>
       <div className="flex items-center gap-2">
         {/* The scenario colour identifies the row as a swatch. It never carries
             text: #D98324 on #E8EBF0 is ~2.6:1, well under the body-text floor. */}
@@ -23,12 +29,12 @@ export function ScenarioSummary({ scenario, label, accent, nameFor, note }: Prop
           className="inline-block h-2.5 w-2.5 rounded-full"
           style={{ background: accent }}
         />
-        <h3 className="text-sm font-medium">{label}</h3>
+        <h3 className="text-sm font-semibold">{label}</h3>
       </div>
 
       {figures.paidOff ? (
         <>
-          <p className="tnum mt-3 text-3xl leading-none">{figures.payoffMonth}</p>
+          <p className="tnum mt-4 text-3xl leading-none">{figures.payoffMonth}</p>
           <dl className="mt-3 space-y-1 text-sm">
             <div className="flex justify-between gap-4">
               <dt className="text-ink-soft">Takes</dt>

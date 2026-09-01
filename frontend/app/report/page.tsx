@@ -46,14 +46,14 @@ export default function ReportPage() {
     >
       <header className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
         <div>
-          <p className="eyebrow">Your financial report</p>
+          <p className="eyebrow text-primary">Your financial report</p>
           <h1 className="mt-3 font-display text-4xl font-bold tracking-tight sm:text-6xl">
             Here is what your numbers can do.
           </h1>
         </div>
         <Link
           href="/plan/cash-flow"
-          className="shrink-0 rounded-full border border-rule px-5 py-2.5 font-semibold hover:bg-ink/5"
+          className="secondary-button shrink-0"
         >
           Edit my plan
         </Link>
@@ -66,7 +66,7 @@ export default function ReportPage() {
       )}
 
       {report === null ? (
-        <section className="mt-12 rounded-3xl border border-rule bg-white p-8">
+        <section className="panel mt-12">
           <h2 className="font-display text-2xl font-semibold">Your report needs complete entries.</h2>
           <p className="mt-3 text-ink-soft">
             {pending
@@ -92,7 +92,7 @@ export default function ReportPage() {
             />
             <section
               aria-labelledby="payment-budget-heading"
-              className="rounded-3xl border border-rule bg-white p-6 sm:p-8"
+              className="panel panel-mint lg:self-start"
             >
               <h2 id="payment-budget-heading" className="eyebrow">Debt payment budget</h2>
               {report.cash_flow.status === "deficit" ? (
@@ -111,7 +111,7 @@ export default function ReportPage() {
           </div>
 
           {plan === null ? (
-            <section aria-labelledby="payoff-heading" className="rounded-3xl border border-rule bg-white p-8">
+            <section aria-labelledby="payoff-heading" className="panel">
               <h2 id="payoff-heading" className="eyebrow">Payoff strategies</h2>
               <p className="mt-4 text-ink-soft">
                 {report.cash_flow.status === "deficit"
@@ -120,8 +120,9 @@ export default function ReportPage() {
               </p>
             </section>
           ) : (
-            <section aria-labelledby="payoff-heading" className="rounded-3xl border border-rule bg-white p-6 sm:p-8">
-              <h2 id="payoff-heading" className="eyebrow">Estimated payoff</h2>
+            <section aria-labelledby="payoff-heading" className="panel">
+              <p className="eyebrow text-primary">Strategy comparison</p>
+              <h2 id="payoff-heading" className="mt-2 font-display text-2xl font-semibold">Estimated payoff</h2>
               <div className="mt-6">
                 <EscapeChart tracks={tracks} startMonth={plan.start_month} dimmed={pending || stale} />
               </div>
