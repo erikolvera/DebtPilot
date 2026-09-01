@@ -1,28 +1,18 @@
 @import "tailwindcss";
 
-/* Light is the base definition; dark redefines only the values. Tailwind v4's
-   `@theme inline` then maps them onto colour utilities, which is what lets a
-   media query change the palette without redeclaring the theme. */
 :root {
-  --paper: #e8ebf0;
-  --ink: #1b2028;
-  --ink-soft: #59616f;
-  --rule: #c8ceda;
-  --baseline: #7c8497;
-  --snowball: #d98324;
-  --avalanche: #0e7c6b;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #14161c;
-    --ink: #e6e9ef;
-    --ink-soft: #98a1b2;
-    --rule: #2c313c;
-    --baseline: #98a1b2;
-    --snowball: #e89a44;
-    --avalanche: #22a491;
-  }
+  --paper: #f8f9ff;
+  --ink: #202547;
+  --ink-soft: #676d8c;
+  --rule: #dfe3f1;
+  --baseline: #929ab5;
+  --snowball: #ff7968;
+  --avalanche: #4f9d84;
+  --primary: #584ee8;
+  --sky: #46bfe8;
+  --sun: #ffd368;
+  --mint: #dff8ec;
+  --coral-soft: #fff0ec;
 }
 
 @theme inline {
@@ -33,6 +23,11 @@
   --color-baseline: var(--baseline);
   --color-snowball: var(--snowball);
   --color-avalanche: var(--avalanche);
+  --color-primary: var(--primary);
+  --color-sky: var(--sky);
+  --color-sun: var(--sun);
+  --color-mint: var(--mint);
+  --color-coral-soft: var(--coral-soft);
 
   --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
   --font-body: var(--font-instrument), ui-sans-serif, system-ui, sans-serif;
@@ -40,11 +35,15 @@
 }
 
 html {
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 body {
-  background: var(--paper);
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 8% 4%, rgb(255 211 104 / 24%), transparent 25rem),
+    radial-gradient(circle at 94% 8%, rgb(70 191 232 / 18%), transparent 28rem),
+    var(--paper);
   color: var(--ink);
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
+import { AppHeader } from "@/components/AppHeader";
 import "./globals.css";
 
 // Variable font: omit `weight`, and list extra axes. `wght` is implicit and
@@ -34,7 +35,14 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${bricolage.variable} ${instrument.variable} ${plexMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <AppHeader />
+        {children}
+        <footer className="mx-auto flex max-w-[1280px] flex-col justify-between gap-3 border-t border-rule px-5 py-8 text-sm text-ink-soft sm:flex-row sm:px-8 lg:px-10">
+          <p>DebtPilot · deterministic planning, private by default.</p>
+          <p>Estimates only — not financial advice.</p>
+        </footer>
+      </body>
     </html>
   );
 }
