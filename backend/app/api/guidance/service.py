@@ -87,13 +87,16 @@ def explain(
             return _template(presentation)
         provider = GeminiProvider(key)
 
-    if not _model_budget.allow():
-        logger.warning("hourly model-call budget exhausted; serving the template")
-        return _template(presentation)
-
     prompt = build_prompt(presentation)
 
     for _ in range(MAX_ATTEMPTS):
+        # Inside the loop, not above it: a retry is a second paid call, so
+        # charging the budget once per request would let MAX_ATTEMPTS quietly
+        # double the ceiling the constant advertises.
+        if not _model_budget.allow():
+            logger.warning("hourly model-call budget exhausted; serving the template")
+            return _template(presentation)
+
         try:
             raw = provider.generate(prompt)
         except ProviderError as exc:

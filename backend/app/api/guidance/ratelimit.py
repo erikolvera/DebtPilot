@@ -56,12 +56,7 @@ class RateLimiter:
         # couple of extra requests slipping through, which is within the
         # tolerance of a limiter this modest.
         recent = [hit for hit in self._hits.get(key, []) if hit > cutoff]
-        if recent:
-            self._hits[key] = recent
-        else:
-            # Drop the bucket rather than leaving an empty list behind: the
-            # dict would otherwise grow a key per unique caller forever.
-            self._hits.pop(key, None)
+        self._hits[key] = recent
         if len(recent) >= RATE_LIMIT:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -73,8 +68,10 @@ class RateLimiter:
                     }
                 ],
             )
+        # `recent` is the stored list, so appending updates it in place. An
+        # empty bucket cannot survive: reaching here means we did not raise,
+        # and we always append.
         recent.append(moment)
-        self._hits[key] = recent
 
 
 _limiter = RateLimiter()

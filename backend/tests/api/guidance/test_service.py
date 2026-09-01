@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from app.api.guidance import service
 from app.api.guidance.provider import ProviderError
-from app.api.guidance.service import explain, gemini_api_key
+from app.api.guidance.service import MAX_ATTEMPTS, explain, gemini_api_key
 from app.engine import Debt
 
 PORTFOLIO = [
@@ -197,3 +197,21 @@ def test_the_model_budget_forgets_calls_older_than_an_hour():
 
 def test_the_budget_uses_the_clock_when_no_time_is_supplied():
     assert service._ModelCallBudget().allow() is True
+
+
+def test_a_retry_costs_a_second_slot_of_the_budget():
+    """Charge per call, not per request.
+
+    A rejected first attempt is retried, so one request can be two paid calls.
+    Checking the budget once per request would let MAX_ATTEMPTS quietly double
+    the ceiling the constant advertises -- a spend limit that is wrong by a
+    factor of two is not a spend limit.
+    """
+    service.reset_model_budget()
+    always_bad = _Fixed(BAD, BAD)
+
+    guidance = service.explain(PORTFOLIO, EXTRA, START, provider=always_bad)
+
+    assert guidance.source == "template"
+    assert always_bad.calls == MAX_ATTEMPTS
+    assert len(service._model_budget._calls) == MAX_ATTEMPTS
