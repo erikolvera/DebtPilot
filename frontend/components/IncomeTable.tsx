@@ -34,9 +34,9 @@ function incomeErrors(income: IncomeDraft): IncomeErrors {
   }
 
   if (!DECIMAL.test(income.amount)) {
-    errors.amount = "Pay amount must be a plain amount, like 1200.50";
+    errors.amount = "Take-home amount must be a plain amount, like 1200.50";
   } else if (Number(income.amount) > MONEY_MAX) {
-    errors.amount = "Pay amount is too large";
+    errors.amount = "Take-home amount is too large";
   }
 
   return errors;
@@ -104,7 +104,7 @@ export function IncomeTable({ incomes, onChange }: Props) {
                 Pay basis
               </th>
               <th scope="col" className="eyebrow w-[22%] py-2 text-right font-normal">
-                Amount
+                Take-home amount
               </th>
               <th scope="col" className="sr-only">
                 Remove
@@ -154,7 +154,7 @@ export function IncomeTable({ incomes, onChange }: Props) {
                       inputMode="decimal"
                       value={income.amount}
                       onChange={(event) => update(income.id, "amount", event.target.value)}
-                      aria-label={`${label} — pay amount`}
+                      aria-label={`${label} — take-home amount`}
                       aria-invalid={errors.amount !== undefined}
                       aria-describedby={
                         errors.amount ? `income-${index}-amount-error` : undefined
@@ -190,8 +190,10 @@ export function IncomeTable({ incomes, onChange }: Props) {
       )}
 
       <p className="mt-4 text-xs leading-relaxed text-ink-soft">
-        Annual salary is divided by 12. Weekly pay uses 52 checks per year;
-        biweekly pay uses 26. The report converts each to a monthly average.
+        Enter the amount that reaches your account after taxes and payroll
+        deductions. For Salary (annual), use your yearly take-home total. Weekly
+        pay uses 52 checks per year; biweekly pay uses 26. The report converts
+        each to a monthly average.
       </p>
 
       <button
