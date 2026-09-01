@@ -26,6 +26,9 @@ function describe(cause: unknown): string {
   if (cause instanceof ApiError && cause.status === 413) {
     return "That's more cards than the planner takes at once.";
   }
+  if (cause instanceof Error && cause.name === "TimeoutError") {
+    return "The planner is taking too long. Your numbers are still here.";
+  }
   return "Can't reach the planner right now. Your numbers are still here.";
 }
 
