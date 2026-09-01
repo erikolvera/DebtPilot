@@ -23,6 +23,16 @@ export function DebtTable({ debts, onChange }: Props) {
       { id: crypto.randomUUID(), name: "", balance: "", apr: "", minimum_payment: "" },
     ]);
 
+  // Messages live below the table, not in the cells: the numeric columns are
+  // ~112px wide, so an in-cell message wrapped to three lines and doubled the
+  // row's height, clipping the card name beside it. The inset marker on the
+  // input says WHICH field; this list says what is wrong with it.
+  const problems = debts.flatMap((debt) => {
+    const errors = debtErrors(debt);
+    const label = debt.name.trim() || "Untitled card";
+    return Object.values(errors).map((message) => `${label}: ${message}`);
+  });
+
   return (
     <section aria-labelledby="cards-heading">
       <h2 id="cards-heading" className="eyebrow">
@@ -61,9 +71,6 @@ export function DebtTable({ debts, onChange }: Props) {
                       aria-invalid={errors.name !== undefined}
                       placeholder="Card name"
                     />
-                    {errors.name !== undefined && (
-                      <p className="mt-1 text-left text-xs text-ink-soft">{errors.name}</p>
-                    )}
                   </td>
                   <td className="py-1">
                     <input
@@ -79,9 +86,6 @@ export function DebtTable({ debts, onChange }: Props) {
                       aria-invalid={errors.balance !== undefined}
                       placeholder="0.00"
                     />
-                    {errors.balance !== undefined && (
-                      <p className="mt-1 text-right text-xs text-ink-soft">{errors.balance}</p>
-                    )}
                   </td>
                   <td className="py-1">
                     <input
@@ -94,9 +98,6 @@ export function DebtTable({ debts, onChange }: Props) {
                       aria-invalid={errors.apr !== undefined}
                       placeholder="0.00"
                     />
-                    {errors.apr !== undefined && (
-                      <p className="mt-1 text-right text-xs text-ink-soft">{errors.apr}</p>
-                    )}
                   </td>
                   <td className="py-1">
                     <input
@@ -109,9 +110,6 @@ export function DebtTable({ debts, onChange }: Props) {
                       aria-invalid={errors.minimum_payment !== undefined}
                       placeholder="0.00"
                     />
-                    {errors.minimum_payment !== undefined && (
-                      <p className="mt-1 text-right text-xs text-ink-soft">{errors.minimum_payment}</p>
-                    )}
                   </td>
                   <td className="py-1 pl-1">
                     <button
@@ -128,6 +126,14 @@ export function DebtTable({ debts, onChange }: Props) {
             })}
           </tbody>
         </table>
+      )}
+
+      {problems.length > 0 && (
+        <ul aria-live="polite" className="mt-3 space-y-1 text-xs text-ink-soft">
+          {problems.map((problem) => (
+            <li key={problem}>{problem}</li>
+          ))}
+        </ul>
       )}
 
       <button
