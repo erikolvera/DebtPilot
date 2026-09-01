@@ -8,6 +8,7 @@ dependencies = [
   "sqlalchemy>=2.0",
   "psycopg[binary]>=3.2",
   "pyjwt[crypto]>=2.9",
+  "google-genai>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -32,4 +33,6 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
-exclude_lines = ["if TYPE_CHECKING:"]
+# A Protocol declares a shape and has no runtime behaviour: its method
+# bodies are `...` and are never executed by anything.
+exclude_lines = ["if TYPE_CHECKING:", "class \\w+\\(Protocol\\):"]
