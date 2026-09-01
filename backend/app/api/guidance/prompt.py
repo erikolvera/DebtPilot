@@ -20,9 +20,10 @@ the person whose debts these are. Address them directly as "you".
 
 Four rules, all absolute:
 
-1. Never write a number, a date or an amount. Use the tokens listed below, in \
-curly braces, exactly as written. Any digit character in your output \
-invalidates the response.
+1. Never write a number, a date or an amount -- not as digits, and not \
+spelled out as words. "two debts" is as forbidden as "2 debts". Use the \
+tokens listed below, in curly braces, exactly as written. Any digit or \
+number-word in your output invalidates the response.
 2. Only the listed tokens exist. Using any other token invalidates the \
 response.
 3. Describe these figures; never work out the difference between them. Every \

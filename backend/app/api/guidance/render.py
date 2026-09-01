@@ -15,6 +15,17 @@ TOKEN_PATTERN = re.compile(r"\{([a-z_]+)\}")
 
 _FIELDS = ("headline", "body")
 
+# Forbidding only digits teaches the workaround: a generator told "no digits"
+# that wants to state a count writes "two debts". Ordinals ("first", "second")
+# stay allowed -- they order rather than quantify, and the shipped template
+# uses one.
+_NUMBER_WORDS = frozenset(
+    "zero one two three four five six seven eight nine ten eleven twelve "
+    "thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty "
+    "thirty forty fifty sixty seventy eighty ninety hundred thousand million "
+    "billion half quarter dozen".split()
+)
+
 
 class GuidanceRejected(Exception):
     """The generated output failed validation and must not be shown."""
@@ -39,13 +50,21 @@ def _parse(raw: str) -> dict[str, str]:
     return payload
 
 
-def _reject_digits(text: str) -> None:
-    # Every token name is alphabetic and every figure arrives by substitution,
-    # so one digit means a number was written directly. `isdigit` covers
-    # Arabic-Indic and other non-ASCII numerals, so "٣ months" is refused
-    # alongside "3 months".
-    if any(char.isdigit() for char in text):
-        raise GuidanceRejected("output contains a digit")
+def _reject_numbers(text: str) -> None:
+    """Refuse any figure written directly, as a character or as a word.
+
+    `unicodedata.numeric` is strictly wider than `str.isdigit`: it covers the
+    Nd digits, Nl Roman numerals, No fractions and circled forms, and the CJK
+    numerals in the Lo category, all in one call.
+
+    The word check is the one that matters in practice. Exotic numerals are
+    not what a language model reaches for -- English cardinals are.
+    """
+    if any(unicodedata.numeric(char, None) is not None for char in text):
+        raise GuidanceRejected("output contains a numeric character")
+    for word in re.findall(r"[a-z]+", text.lower()):
+        if word in _NUMBER_WORDS:
+            raise GuidanceRejected(f"output spells a number: {word}")
 
 
 def _reject_unknown_tokens(text: str, presentation: Mapping[str, str]) -> None:
@@ -82,7 +101,7 @@ def render(raw: str, presentation: Mapping[str, str]) -> Narrative:
         text = payload[field]
         if not text.strip():
             raise GuidanceRejected(f"empty field: {field}")
-        _reject_digits(text)
+        _reject_numbers(text)
         _reject_unknown_tokens(text, presentation)
         _reject_stray_braces(text)
 

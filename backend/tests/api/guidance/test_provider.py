@@ -128,3 +128,54 @@ def test_gemini_treats_an_empty_response_as_a_failure(monkeypatch):
     monkeypatch.setattr(genai, "Client", _Client)
     with pytest.raises(ProviderError, match="empty response"):
         GeminiProvider(api_key="k").generate("prompt")
+
+
+def test_gemini_pins_the_call_it_makes(monkeypatch):
+    """The request shape is the contract, so assert it field by field.
+
+    Every other Gemini test stubs `generate_content(**kwargs)` and throws the
+    kwargs away, so the model name could change to a costlier one, the
+    temperature could drift to 1.0, or the JSON mode could be dropped
+    entirely, and the whole suite would stay green while production quietly
+    changed behaviour. Nothing here reaches the network; the point is that
+    the arguments are what we think they are.
+    """
+    import google.genai as genai
+
+    captured: dict[str, object] = {}
+
+    class _Models:
+        def generate_content(self, **kwargs):
+            captured.update(kwargs)
+            return type("R", (), {"text": '{"headline": "H", "body": "B"}'})()
+
+    class _Client:
+        def __init__(self, **kwargs):
+            captured["api_key"] = kwargs.get("api_key")
+            self.models = _Models()
+
+    monkeypatch.setattr(genai, "Client", _Client)
+    GeminiProvider(api_key="k", timeout=8.0).generate("the prompt")
+
+    assert captured["api_key"] == "k"
+    assert captured["model"] == "gemini-2.5-flash"
+    assert captured["contents"] == "the prompt"
+
+    config = captured["config"]
+    # Low but not zero: zero is not a determinism guarantee from a hosted
+    # model, and the validation chain -- not the sampler -- is what makes the
+    # output safe. Low temperature just keeps the prose boring.
+    assert config.temperature == 0.2
+    assert config.response_mime_type == "application/json"
+    assert config.response_schema == {
+        "type": "object",
+        "properties": {
+            "headline": {"type": "string"},
+            "body": {"type": "string"},
+        },
+        "required": ["headline", "body"],
+    }
+    # The SDK takes milliseconds; the constructor takes seconds. A unit slip
+    # here turns an 8-second budget into an 8-millisecond one, which fails
+    # every call, or into a 2.2-hour one, which hangs a worker thread.
+    assert config.http_options.timeout == 8000

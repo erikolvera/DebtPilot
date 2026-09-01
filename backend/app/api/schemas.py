@@ -51,11 +51,44 @@ Money = Annotated[
 MONEY_MAX = Decimal("99999999.99")
 
 
+MAX_DEBTS_PER_USER = 20
+
+
+def _non_blank(value: Any) -> Any:
+    """Strip, then require content.
+
+    The column's CHECK is `length(trim(name)) between 1 and 120`. Pydantic's
+    `min_length` alone accepts "   ", which passes validation and then
+    violates the constraint as an unhandled IntegrityError -- a 500 from a
+    well-formed request. Stripping here keeps the two layers agreeing on what
+    "empty" means.
+    """
+    if isinstance(value, str):
+        if "\x00" in value:
+            # Postgres text columns cannot hold NUL, and psycopg raises on the
+            # way in -- a 500 from a request that otherwise validates.
+            raise ValueError("must not contain NUL bytes")
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("must not be blank")
+        return stripped
+    return value
+
+
+NonBlankName = Annotated[
+    str, BeforeValidator(_non_blank), Field(min_length=1, max_length=120)
+]
+
+
 class DebtIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1, max_length=64)
-    name: str = Field(min_length=1, max_length=120)
+    # NonBlankName, not a bare length-bounded str: this name is substituted
+    # into guidance prose, and the containment argument in the design spec
+    # depends on it arriving NUL-free and non-blank. A whitespace-only name
+    # would also render as an empty debt in a sentence.
+    name: NonBlankName
     balance: Money = Field(ge=0, le=MONEY_MAX)
     apr: Money = Field(ge=0, le=Decimal("999.99"), decimal_places=2)
     minimum_payment: Money = Field(ge=0, le=MONEY_MAX)
@@ -154,35 +187,6 @@ class PayoffPlanResponse(BaseModel):
     start_month: str
     scenarios: ScenariosOut
     comparison: ComparisonOut
-
-
-MAX_DEBTS_PER_USER = 20
-
-
-def _non_blank(value: Any) -> Any:
-    """Strip, then require content.
-
-    The column's CHECK is `length(trim(name)) between 1 and 120`. Pydantic's
-    `min_length` alone accepts "   ", which passes validation and then
-    violates the constraint as an unhandled IntegrityError -- a 500 from a
-    well-formed request. Stripping here keeps the two layers agreeing on what
-    "empty" means.
-    """
-    if isinstance(value, str):
-        if "\x00" in value:
-            # Postgres text columns cannot hold NUL, and psycopg raises on the
-            # way in -- a 500 from a request that otherwise validates.
-            raise ValueError("must not contain NUL bytes")
-        stripped = value.strip()
-        if not stripped:
-            raise ValueError("must not be blank")
-        return stripped
-    return value
-
-
-NonBlankName = Annotated[
-    str, BeforeValidator(_non_blank), Field(min_length=1, max_length=120)
-]
 
 
 class DebtCreate(BaseModel):

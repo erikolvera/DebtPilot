@@ -1,6 +1,7 @@
 import json
 from decimal import Decimal
 
+from app.api.guidance import service
 from app.api.guidance.provider import ProviderError
 from app.api.guidance.service import explain, gemini_api_key
 from app.engine import Debt
@@ -116,3 +117,83 @@ def test_a_configured_key_builds_a_gemini_provider(monkeypatch):
     result = explain(PORTFOLIO, EXTRA, START)
     # The call was attempted and failed, so we land on the fallback.
     assert result.source == "template"
+
+
+def test_the_fallback_survives_its_own_template_being_rejected(monkeypatch):
+    """The floor under the floor.
+
+    `_template` renders through the same validation chain as generated prose.
+    If a future edit puts a numeral or a stray token into the template copy,
+    the fallback would raise -- on the one path whose entire job is not
+    failing -- and a well-formed request would return a 500. It must degrade
+    to a fixed sentence instead.
+    """
+    def _reject(*args, **kwargs):
+        raise service.GuidanceRejected("the template itself is broken")
+
+    monkeypatch.setattr(service, "render", _reject)
+    guidance = service.explain(PORTFOLIO, EXTRA, START)
+
+    assert guidance is service._LAST_RESORT
+    assert guidance.source == "template"
+    # The last resort must itself be token-free and number-free, or it would
+    # be rejected by the same rules that got us here.
+    assert "{" not in guidance.body
+    assert not any(char.isdigit() for char in guidance.headline + guidance.body)
+
+
+def test_a_portfolio_of_cleared_debts_never_calls_the_model():
+    """Debts exist, but none of them can be compared.
+
+    Keying the short-circuit on `not debts` would miss this: a user who has
+    paid everything off still has rows, so the old check would have paid for
+    a model call to narrate an empty comparison.
+    """
+    calls: list[str] = []
+
+    class _Counting:
+        def generate(self, prompt: str) -> str:
+            calls.append(prompt)
+            raise AssertionError("must not be reached")
+
+    cleared = (
+        Debt(id="a", name="Cleared", balance=Decimal("0"), apr=Decimal("22"),
+             minimum_payment=Decimal("25")),
+    )
+    guidance = service.explain(cleared, EXTRA, START, provider=_Counting())
+
+    assert calls == []
+    assert guidance.source == "template"
+
+
+def test_the_hourly_model_budget_stops_paid_calls_and_serves_the_template():
+    service.reset_model_budget()
+    calls: list[str] = []
+
+    class _Counting:
+        def generate(self, prompt: str) -> str:
+            calls.append(prompt)
+            return json.dumps({"headline": "{avalanche_months}", "body": "ok"})
+
+    for _ in range(service.MAX_MODEL_CALLS_PER_HOUR):
+        assert service.explain(
+            PORTFOLIO, EXTRA, START, provider=_Counting()
+        ).source == "model"
+
+    assert len(calls) == service.MAX_MODEL_CALLS_PER_HOUR
+    over = service.explain(PORTFOLIO, EXTRA, START, provider=_Counting())
+    assert over.source == "template"
+    assert len(calls) == service.MAX_MODEL_CALLS_PER_HOUR
+
+
+def test_the_model_budget_forgets_calls_older_than_an_hour():
+    budget = service._ModelCallBudget()
+    for i in range(service.MAX_MODEL_CALLS_PER_HOUR):
+        assert budget.allow(now=1000.0 + i) is True
+    assert budget.allow(now=1000.0 + service.MAX_MODEL_CALLS_PER_HOUR) is False
+    # An hour past the last recorded call, every slot is free again.
+    assert budget.allow(now=1000.0 + service.MAX_MODEL_CALLS_PER_HOUR + 3601.0) is True
+
+
+def test_the_budget_uses_the_clock_when_no_time_is_supplied():
+    assert service._ModelCallBudget().allow() is True

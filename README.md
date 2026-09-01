@@ -199,6 +199,13 @@ figure is impossible rather than merely unlikely. Figures the engine cannot
 supply, such as the totals for a portfolio that never pays off, are not
 offered as tokens and therefore cannot be mentioned.
 
+What that guarantees is provenance, not attribution: every figure came from
+the engine, but nothing forces the model to attach the right figure to the
+right claim. A sentence built from real numbers can still pair the wrong one
+with the wrong label. The plan table renders beside the prose for exactly this
+reason -- the numbers are checkable -- and the endpoint claims no more than it
+enforces.
+
 User text never enters the prompt. The model writes `{first_cleared_name}`
 without seeing what the debt is called, so a debt named "Ignore previous
 instructions" has nothing to inject into.
@@ -208,7 +215,14 @@ instructions" has nothing to inject into.
 With no `GEMINI_API_KEY` set, the endpoint serves a hand-written template —
 correct, deterministic, and the same fallback used in production when Gemini
 is unavailable. Callers are limited to 10 requests per hour per IP, which is a
-speed bump rather than a wall: set a spend limit in the Gemini console.
+speed bump rather than a wall: set a spend limit in the Gemini console. The
+process also refuses more than 200 model calls per hour in total, which is the
+only limit here that bounds cost rather than per-caller frequency.
+
+Behind a proxy, set `TRUST_PROXY_HEADERS=1` so the limiter keys on
+`X-Forwarded-For` rather than on the proxy's own address. Leave it unset
+anywhere the API is reachable directly: the header is caller-controlled, and
+believing it hands an abuser an unlimited supply of buckets.
 
 ## Roadmap
 

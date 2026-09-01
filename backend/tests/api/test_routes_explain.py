@@ -123,3 +123,14 @@ def test_the_limit_applies_even_without_a_paid_call(client):
 def test_the_plan_route_is_not_rate_limited(client):
     for _ in range(RATE_LIMIT + 5):
         assert client.post("/v1/payoff-plans", json=body()).status_code == 200
+
+
+def test_a_far_future_start_month_does_not_crash(client):
+    # month_label writes the year as f"{year:04d}", so a plan running past
+    # year 9999 once produced "10000-07" and a ValueError from a well-formed
+    # request -- an unauthenticated 500.
+    response = client.post(
+        "/v1/payoff-plans/explain", json=body(start_month="9999-12")
+    )
+    assert response.status_code == 200
+    assert response.json()["headline"].strip()

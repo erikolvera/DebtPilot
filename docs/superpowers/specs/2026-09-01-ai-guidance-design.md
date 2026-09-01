@@ -286,6 +286,18 @@ schemas. The substituted value is additionally stripped of control characters.
 is a contract note rather than a code change, and it belongs in the README
 beside the endpoint.
 
+**What the guarantee actually is: provenance, not attribution.** Every number
+the reader sees came from the engine -- that is enforced, and it is the whole
+reason for the token scheme. What no amount of validation can enforce is that
+the model attached the right number to the right claim. A response that says
+"snowball saves you {interest_saved_avalanche_vs_baseline}" is composed
+entirely of engine output and is still wrong. The mitigations are the prompt's
+description of each token, the low temperature, and the fact that a
+mis-attributed figure is at least a figure the user can check against the
+table rendered beside it. Copy must therefore never promise accuracy the
+architecture does not deliver: it prevents invented numbers, which is the
+failure mode that actually loses money, not every possible misstatement.
+
 Substitution happens after token extraction, so a debt name that itself
 contains braces is inserted as literal text and never re-scanned.
 

@@ -14,7 +14,7 @@ from decimal import Decimal
 
 from app.engine import Debt, Outcome, PlanComparison, PlanSummary
 
-from ..dates import month_label, parse_month
+from ..dates import parse_month, shift_month
 
 _MONTH_NAMES = (
     "January", "February", "March", "April", "May", "June",
@@ -43,7 +43,11 @@ def _months(count: int) -> str:
 
 
 def _calendar(start_month: str, index: int) -> str:
-    year, month = parse_month(month_label(start_month, index))
+    # Shift directly rather than formatting with month_label and re-parsing.
+    # month_label writes the year as f"{year:04d}", so a far-future start month
+    # produces "10000-07", which parse_month then rejects -- a ValueError from
+    # a well-formed request, raised outside every handler.
+    year, month = shift_month(*parse_month(start_month), index - 1)
     return f"{_MONTH_NAMES[month - 1]} {year}"
 
 

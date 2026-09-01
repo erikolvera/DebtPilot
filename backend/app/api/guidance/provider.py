@@ -48,7 +48,7 @@ class TemplateProvider:
             return (
                 "Nothing to pay off yet.",
                 "You have {debt_count} on file, so there is no payoff plan to "
-                "compare. Add a debt to see one.",
+                "compare yet. Add a debt and a plan will appear here.",
             )
 
         sentences = [
@@ -91,24 +91,29 @@ class GeminiProvider:
         from google import genai
         from google.genai import types
 
+        # Built OUTSIDE the try on purpose. An SDK rename here is a programming
+        # error and should fail loudly in staging, not be swallowed into a
+        # silent permanent fallback that nobody notices in production.
+        config = types.GenerateContentConfig(
+            temperature=0.2,
+            response_mime_type="application/json",
+            response_schema={
+                "type": "object",
+                "properties": {
+                    "headline": {"type": "string"},
+                    "body": {"type": "string"},
+                },
+                "required": ["headline", "body"],
+            },
+            http_options=types.HttpOptions(timeout=int(self._timeout * 1000)),
+        )
+
         try:
             client = genai.Client(api_key=self._api_key)
             response = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.2,
-                    response_mime_type="application/json",
-                    response_schema={
-                        "type": "object",
-                        "properties": {
-                            "headline": {"type": "string"},
-                            "body": {"type": "string"},
-                        },
-                        "required": ["headline", "body"],
-                    },
-                    http_options=types.HttpOptions(timeout=int(self._timeout * 1000)),
-                ),
+                config=config,
             )
         except Exception as exc:  # the SDK raises a variety of transport errors
             raise ProviderError(str(exc)) from exc

@@ -300,9 +300,13 @@ AI guidance
 - POST /v1/payoff-plans/explain — built. Same body as the plan route;
   recomputes server-side and returns a narrative plus a `source` field.
   Anonymous, rate limited, and never 5xx for a generation problem.
-- The model writes tokens, not numbers: its output must contain no digits, and
-  every token must exist in that request's presentation dictionary. Figures the
-  engine cannot supply are not offered, so they cannot be stated.
+- The model writes tokens, not numbers: its output must contain no numeric
+  character in any script and no spelled-out cardinal ("seven", "a dozen"),
+  and every token must exist in that request's presentation dictionary.
+  Figures the engine cannot supply are not offered, so they cannot be stated.
+- The guarantee is provenance, not attribution. Every number came from the
+  engine; nothing forces the model to pair the right number with the right
+  claim. User-facing copy must not promise more than that.
 - User text never enters the prompt; debt names are substituted afterwards.
 - POST /ask — deferred. It accepts arbitrary user text and needs its own
   design for injection, scoping and conversation state.
@@ -360,5 +364,9 @@ The engine is a framework-free package inside the backend:
   a sentence needs a number, that number is a field on the engine's result and
   a token in the presentation dictionary — add it there rather than letting the
   model derive it.
+- The fallback path must never raise. `guidance/service.py` renders the
+  template through the same validation chain as generated prose, so it catches
+  its own rejection and returns a fixed sentence: a 500 on the path whose job
+  is not failing is worse than dull copy.
 - Never hardcode API keys or database URLs. Use environment variables and
   keep a `.env.example` file up to date.

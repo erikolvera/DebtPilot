@@ -250,3 +250,33 @@ def test_money_accepts_a_decimal_from_internal_construction():
 def test_a_bool_is_still_rejected_as_money():
     with pytest.raises(ValidationError, match="JSON string"):
         DebtIn(**debt_payload(balance=True))
+
+
+def test_a_plan_request_rejects_a_blank_or_nul_debt_name():
+    """The same name rules as a stored debt, for a different reason.
+
+    A name on this endpoint is never written to Postgres, so the NUL rule is
+    not about the column. It is substituted into guidance prose, and the
+    containment argument in the design spec claims names arrive NUL-free and
+    non-blank. Before this, that claim was true only of the persisted path.
+    """
+    for name in ("   ", "Vi\x00sa"):
+        with pytest.raises(ValidationError):
+            DebtIn(
+                id="a",
+                name=name,
+                balance="100.00",
+                apr="20.00",
+                minimum_payment="25.00",
+            )
+
+
+def test_a_plan_request_strips_surrounding_whitespace_from_a_debt_name():
+    debt = DebtIn(
+        id="a",
+        name="  Visa  ",
+        balance="100.00",
+        apr="20.00",
+        minimum_payment="25.00",
+    )
+    assert debt.name == "Visa"

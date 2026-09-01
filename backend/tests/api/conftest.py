@@ -18,6 +18,8 @@ import uuid
 from collections.abc import Iterator
 
 import pytest
+
+from app.api.guidance.service import reset_model_budget
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection, Engine
 
@@ -81,3 +83,17 @@ def clean_debts(db_engine: Engine) -> Iterator[None]:
     with db_engine.begin() as conn:
         conn.execute(text("delete from public.debts"))
         conn.execute(text("delete from auth.users where email like '%@example.test'"))
+
+
+@pytest.fixture(autouse=True)
+def _reset_guidance_budget():
+    """Clear the process-wide model-call budget between tests.
+
+    It is module-level state by design -- a per-process ceiling is the point --
+    which makes it leak across tests: the budget test deliberately exhausts it,
+    and without this every later test that reaches a provider would silently
+    receive the template and assert against the wrong source.
+    """
+    reset_model_budget()
+    yield
+    reset_model_budget()
