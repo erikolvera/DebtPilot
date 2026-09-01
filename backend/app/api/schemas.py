@@ -245,3 +245,16 @@ class DebtOut(BaseModel):
     minimum_payment: Money
     created_at: datetime
     updated_at: datetime
+
+
+class ExplainResponse(BaseModel):
+    """A narrative of a payoff comparison.
+
+    `source` reports which provider served it. A client that cannot tell
+    whether it received generated prose or the deterministic fallback cannot
+    decide whether to label it, and silently degrading should be visible.
+    """
+
+    headline: str
+    body: str
+    source: Literal["model", "template"]
