@@ -3,6 +3,8 @@
 [![Backend CI](https://github.com/erikolvera/DebtPilot/actions/workflows/backend.yml/badge.svg)](https://github.com/erikolvera/DebtPilot/actions/workflows/backend.yml)
 [![Frontend CI](https://github.com/erikolvera/DebtPilot/actions/workflows/frontend.yml/badge.svg)](https://github.com/erikolvera/DebtPilot/actions/workflows/frontend.yml)
 
+[Live app](https://debtpilot-lyart.vercel.app) · [API documentation](https://debtpilot-api.vercel.app/docs)
+
 DebtPilot turns a monthly household budget into a realistic debt-payoff plan.
 It calculates:
 
