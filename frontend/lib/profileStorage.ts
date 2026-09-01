@@ -1,0 +1,138 @@
+import type {
+  DebtType,
+  ExpenseDraft,
+  FinancialDebtDraft,
+  IncomeDraft,
+} from "./api";
+
+export type StorageLike = Pick<Storage, "getItem" | "setItem">;
+
+export type FinancialProfile = {
+  incomes: IncomeDraft[];
+  expenses: ExpenseDraft[];
+  debts: FinancialDebtDraft[];
+  extra: string;
+};
+
+const PROFILE_KEY = "debtpilot.financial-profile.v2";
+const LEGACY_KEY = "debtpilot.portfolio.v1";
+const DEBT_TYPES = new Set<DebtType>([
+  "credit_card",
+  "auto_loan",
+  "personal_loan",
+  "student_loan",
+  "medical_debt",
+  "other",
+]);
+const EXPENSE_CATEGORIES = new Set([
+  "housing",
+  "food",
+  "utilities",
+  "transportation",
+  "insurance",
+  "healthcare",
+  "childcare",
+  "subscriptions",
+  "personal",
+  "other",
+]);
+
+function hasStrings(value: unknown, fields: string[]): value is Record<string, string> {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return fields.every((field) => typeof record[field] === "string");
+}
+
+function isIncome(value: unknown): value is IncomeDraft {
+  return hasStrings(value, ["id", "name", "monthly_amount"]);
+}
+
+function isExpense(value: unknown): value is ExpenseDraft {
+  return (
+    hasStrings(value, ["id", "name", "category", "monthly_amount"]) &&
+    EXPENSE_CATEGORIES.has(value.category)
+  );
+}
+
+function isDebt(value: unknown): value is FinancialDebtDraft {
+  return (
+    hasStrings(value, ["id", "name", "type", "balance", "apr", "minimum_payment"]) &&
+    DEBT_TYPES.has(value.type as DebtType)
+  );
+}
+
+function isProfile(value: unknown): value is FinancialProfile {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.extra === "string" &&
+    Array.isArray(record.incomes) &&
+    record.incomes.length <= 50 &&
+    record.incomes.every(isIncome) &&
+    Array.isArray(record.expenses) &&
+    record.expenses.length <= 100 &&
+    record.expenses.every(isExpense) &&
+    Array.isArray(record.debts) &&
+    record.debts.length <= 20 &&
+    record.debts.every(isDebt)
+  );
+}
+
+function migrateLegacy(value: unknown): FinancialProfile | null {
+  if (typeof value !== "object" || value === null) return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.extra !== "string" || !Array.isArray(record.debts)) return null;
+  if (record.debts.length > 20) return null;
+  const debts = record.debts.map((value): FinancialDebtDraft | null => {
+    if (!hasStrings(value, ["id", "name", "balance", "apr", "minimum_payment"])) {
+      return null;
+    }
+    return { ...value, type: "credit_card" } as FinancialDebtDraft;
+  });
+  if (debts.some((debt) => debt === null)) return null;
+  return {
+    incomes: [],
+    expenses: [],
+    debts: debts as FinancialDebtDraft[],
+    extra: record.extra,
+  };
+}
+
+export function loadFinancialProfile(
+  storage: StorageLike | null,
+  fallback: FinancialProfile,
+): FinancialProfile {
+  if (!storage) return fallback;
+  try {
+    const current = storage.getItem(PROFILE_KEY);
+    if (current) {
+      const parsed: unknown = JSON.parse(current);
+      return isProfile(parsed) ? parsed : fallback;
+    }
+    const legacy = storage.getItem(LEGACY_KEY);
+    if (!legacy) return fallback;
+    return migrateLegacy(JSON.parse(legacy)) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function saveFinancialProfile(
+  storage: StorageLike | null,
+  profile: FinancialProfile,
+): void {
+  if (!storage) return;
+  try {
+    storage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    // Storage is a convenience. The in-memory report still works.
+  }
+}
+
+export function browserStorage(): StorageLike | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}

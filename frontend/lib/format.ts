@@ -97,11 +97,8 @@ export type ScenarioFigures = {
 /**
  * Everything a scenario is allowed to display.
  *
- * The suppression of spec §3.4 lives here and only here. `total_interest_paid`
- * and `total_paid` are populated for a never-paying-off run, but they cover the
- * simulated window — up to the MAX_MONTHS backstop — not a lifetime.
- * `guidance/presentation.py` withholds them from the AI layer for exactly this
- * reason; a table that stated them would contradict the prose beside it.
+ * Totals for a never-paying-off run cover only the simulation window, not a
+ * lifetime, so the UI intentionally withholds them.
  */
 export function scenarioFigures(scenario: ScenarioOut): ScenarioFigures {
   const base = {

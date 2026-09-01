@@ -177,8 +177,8 @@ def test_compute_schedules_returns_one_schedule_per_strategy():
 
 
 def test_schedules_carry_the_per_debt_grid_that_summaries_drop():
-    # This is the whole point: PlanSummary has monthly_totals but no per-debt
-    # rows, so ?detail=full cannot be served from compute_plans alone.
+    # The internal schedule keeps per-debt rows even though the public summary
+    # only needs aggregate monthly totals and payoff milestones.
     debts = [debt("a", "100.00", "12.00", "50.00")]
     schedules = compute_schedules(debts, ZERO)
     first_month = schedules[Strategy.AVALANCHE].months[0]

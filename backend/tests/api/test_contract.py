@@ -140,21 +140,3 @@ def test_monthly_total_money_survives_the_mapping(client):
         assert wire["month_number"] == engine_total.index
         assert wire["remaining_balance"] == str(engine_total.remaining_balance)
         assert wire["cumulative_interest"] == str(engine_total.cumulative_interest)
-
-
-def test_every_schedule_row_survives_the_mapping(client):
-    from app.engine import Strategy, compute_schedules
-
-    schedules = compute_schedules(ENGINE_PORTFOLIO, Decimal("200.00"))
-    payload = client.post(
-        "/v1/payoff-plans?detail=full", json=body(WIRE_PORTFOLIO)
-    ).json()
-
-    engine_months = schedules[Strategy.AVALANCHE].months
-    wire_months = payload["scenarios"]["avalanche"]["schedule"]
-    assert len(wire_months) == len(engine_months)
-
-    for wire_month, engine_month in zip(wire_months, engine_months, strict=True):
-        assert wire_month["total_payment"] == str(engine_month.total_payment)
-        assert wire_month["total_interest"] == str(engine_month.total_interest)
-        assert wire_month["remaining_balance"] == str(engine_month.remaining_balance)

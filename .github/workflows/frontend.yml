@@ -4,12 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    # Path-filtered, unlike backend.yml, because a frontend-only run needs no
-    # Supabase container and a backend-only PR gains nothing from it. Note the
-    # trade: if branch protection ever marks this check "required", a PR that
-    # touches no frontend file waits forever for a check that never runs, and
-    # the fix is a companion job that always succeeds. Protection is not
-    # available on this repository today, so the trap cannot bite yet.
     paths:
       - "frontend/**"
       - ".github/workflows/frontend.yml"
@@ -21,44 +15,25 @@ jobs:
       run:
         working-directory: frontend
     env:
-      # `npm run build` is a real production build, and lib/api.ts deliberately
-      # throws when this is unset in production -- a build without it would ship
-      # an artifact pointing every user at their own localhost, which no runtime
-      # environment change could repair. So CI supplies one exactly as a deploy
-      # does. The host is never contacted; nothing in these checks makes a
-      # request, and `.invalid` is reserved precisely so it cannot resolve.
       NEXT_PUBLIC_API_BASE_URL: https://api.example.invalid
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          # Pinned to an LTS line rather than "latest": the frontend pins
-          # TypeScript to 5.9 deliberately, and a runtime that moves on its own
-          # is the kind of drift that turns a green branch red with no commit
-          # to blame.
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # `ci`, not `install`: it installs exactly the committed lockfile and
-      # fails if package.json and the lockfile have drifted, which is the
-      # failure worth catching here.
       - name: Install
         run: npm ci
 
-      # Ordered cheapest first, so an obvious break reports in seconds rather
-      # than after a full build.
       - name: Typecheck
         run: npm run typecheck
 
       - name: Lint
         run: npm run lint
 
-      # 65 tests covering the rules the frontend cannot enforce at runtime:
-      # money staying a string end to end, the never-pays-off suppression, the
-      # chart's domain and y-scale, storage corruption recovery, and the
-      # 20-debt cap boundaries.
       - name: Test
         run: npm test
 

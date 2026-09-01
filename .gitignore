@@ -30,6 +30,8 @@ dist/
 # `.claude/` is local machine state -- granted permissions and symlinks into
 # .agents/ that the CLI rebuilds itself.
 .claude/
+.superpowers/
+backend/supabase/
 
 # Next.js frontend
 frontend/.next/

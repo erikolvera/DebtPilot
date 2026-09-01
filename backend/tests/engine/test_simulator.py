@@ -197,3 +197,19 @@ def test_cap_path_underwater_ids_name_only_debts_interest_outruns():
     assert schedule.outcome is Outcome.NEVER_PAYS_OFF
     assert len(schedule.months) == 1200
     assert schedule.underwater_debt_ids == ("u",)
+
+
+def test_schema_maximums_cannot_overflow_decimal_context():
+    # One glacial healthy debt prevents the sound all-underwater early exit
+    # while the other grows for the full horizon at the published API bounds.
+    # The growing balance reaches hundreds of digits; the default Decimal
+    # context cannot quantize it to cents and used to raise InvalidOperation.
+    debts = [
+        debt("healthy", "99999999.99", "0.00", "0.01"),
+        debt("growing", "99999999.99", "999.99", "0.00"),
+    ]
+    schedule = run(debts)
+    assert schedule.outcome is Outcome.NEVER_PAYS_OFF
+    assert len(schedule.months) == 1200
+    assert schedule.underwater_debt_ids == ("growing",)
+    assert schedule.months[-1].remaining_balance.adjusted() > 300

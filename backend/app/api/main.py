@@ -14,9 +14,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.engine import InvalidDebt
 
-from .repositories.debts import DebtLimitReached
-from .routers import debts as debts_router
-from .routers import explain as explain_router
+from .routers import financial_reports
 from .routers import payoff_plans
 
 DEFAULT_ORIGIN = "http://localhost:3000"
@@ -29,10 +27,11 @@ MAX_BODY_BYTES = 256 * 1024
 
 
 class BodySizeLimitMiddleware:
-    """Reject oversized requests from their `content-length` alone.
+    """Reject oversized requests before a downstream parser sees the body.
 
-    Written as raw ASGI rather than a BaseHTTPMiddleware so the rejection
-    happens before anything downstream reads a byte of the body.
+    Content-Length provides a cheap early rejection, but it is optional and a
+    sender can lie. Buffering at most MAX_BODY_BYTES also enforces the limit on
+    chunked bodies. The bounded buffer is replayed to FastAPI afterward.
     """
 
     def __init__(self, app: ASGIApp) -> None:
@@ -42,24 +41,54 @@ class BodySizeLimitMiddleware:
         if scope["type"] == "http":
             declared = Headers(scope=scope).get("content-length", "")
             if declared.isdigit() and int(declared) > MAX_BODY_BYTES:
-                response = JSONResponse(
-                    status_code=413,
-                    content={
-                        "detail": [
-                            {
-                                "type": "request_too_large",
-                                "loc": ["header", "content-length"],
-                                "msg": (
-                                    "Request body exceeds the "
-                                    f"{MAX_BODY_BYTES} byte limit."
-                                ),
-                            }
-                        ]
-                    },
-                )
-                await response(scope, receive, send)
+                await self._reject(scope, receive, send, ["header", "content-length"])
                 return
+
+            messages: list[dict] = []
+            received = 0
+            while True:
+                message = await receive()
+                messages.append(message)
+                if message["type"] != "http.request":
+                    break
+                received += len(message.get("body", b""))
+                if received > MAX_BODY_BYTES:
+                    await self._reject(scope, receive, send, ["body"])
+                    return
+                if not message.get("more_body", False):
+                    break
+
+            index = 0
+
+            async def replay() -> dict:
+                nonlocal index
+                if index < len(messages):
+                    message = messages[index]
+                    index += 1
+                    return message
+                return await receive()
+
+            await self.app(scope, replay, send)
+            return
         await self.app(scope, receive, send)
+
+    @staticmethod
+    async def _reject(
+        scope: Scope, receive: Receive, send: Send, location: list[str]
+    ) -> None:
+        response = JSONResponse(
+            status_code=413,
+            content={
+                "detail": [
+                    {
+                        "type": "request_too_large",
+                        "loc": location,
+                        "msg": f"Request body exceeds the {MAX_BODY_BYTES} byte limit.",
+                    }
+                ]
+            },
+        )
+        await response(scope, receive, send)
 
 
 def allowed_origins() -> list[str]:
@@ -91,18 +120,6 @@ def handle_invalid_debt(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
-def handle_debt_limit(request: Request, exc: Exception) -> JSONResponse:
-    """The per-user debt cap, surfaced as a 422 in FastAPI's error envelope."""
-    return JSONResponse(
-        status_code=422,
-        content={
-            "detail": [
-                {"type": "debt_limit_reached", "loc": ["body"], "msg": str(exc)}
-            ]
-        },
-    )
-
-
 def create_app() -> FastAPI:
     app = FastAPI(title="DebtPilot API", version="1.0.0")
 
@@ -112,11 +129,9 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins(),
-        # No auth, no cookies, no sessions in this slice, so credentialed
-        # requests grant nothing today — and the flag becomes a live footgun
-        # the moment someone sets ALLOWED_ORIGINS=*.
+        # The anonymous MVP uses no cookies or sessions.
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
     app.add_exception_handler(InvalidDebt, handle_invalid_debt)
@@ -125,10 +140,8 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    app.add_exception_handler(DebtLimitReached, handle_debt_limit)
     app.include_router(payoff_plans.router, prefix="/v1")
-    app.include_router(debts_router.router, prefix="/v1")
-    app.include_router(explain_router.router, prefix="/v1")
+    app.include_router(financial_reports.router, prefix="/v1")
     return app
 
 

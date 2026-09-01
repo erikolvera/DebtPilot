@@ -1,16 +1,16 @@
 import type { paths } from "./api-types";
 
-type PlanPost = paths["/v1/payoff-plans"]["post"];
-type ExplainPost = paths["/v1/payoff-plans/explain"]["post"];
+type ReportPost = paths["/v1/financial-reports"]["post"];
 
 // NonNullable: openapi-typescript emits `requestBody?:` for some shapes, and
 // indexing an optional type is an error under strict. It is the identity when
 // the property is already required.
-export type PayoffPlanRequest =
-  NonNullable<PlanPost["requestBody"]>["content"]["application/json"];
-export type PayoffPlanResponse = PlanPost["responses"][200]["content"]["application/json"];
-export type ExplainResponse = ExplainPost["responses"][200]["content"]["application/json"];
+export type FinancialReportRequest =
+  NonNullable<ReportPost["requestBody"]>["content"]["application/json"];
+export type FinancialReportResponse =
+  ReportPost["responses"][200]["content"]["application/json"];
 
+export type PayoffPlanResponse = NonNullable<FinancialReportResponse["payoff_plan"]>;
 export type ScenarioOut = PayoffPlanResponse["scenarios"]["snowball"];
 export type MonthlyTotalOut = ScenarioOut["monthly_totals"][number];
 
@@ -21,6 +21,16 @@ export type DebtDraft = {
   balance: string;
   apr: string;
   minimum_payment: string;
+};
+
+export type DebtType = NonNullable<FinancialReportRequest["debts"][number]["type"]>;
+export type FinancialDebtDraft = DebtDraft & { type: DebtType };
+export type IncomeDraft = { id: string; name: string; monthly_amount: string };
+export type ExpenseDraft = {
+  id: string;
+  name: string;
+  category: FinancialReportRequest["expenses"][number]["category"];
+  monthly_amount: string;
 };
 
 export const DEFAULT_API_BASE = "http://127.0.0.1:8000";
@@ -79,25 +89,36 @@ export function currentStartMonth(now: Date = new Date()): string {
   return `${now.getFullYear()}-${month}`;
 }
 
-export function buildRequest(
-  debts: DebtDraft[],
+export function buildFinancialReportRequest(
+  incomes: IncomeDraft[],
+  expenses: ExpenseDraft[],
+  debts: FinancialDebtDraft[],
   extra: string,
   now: Date = new Date(),
-): PayoffPlanRequest {
+): FinancialReportRequest {
   return {
+    incomes: incomes.map((income) => ({
+      ...income,
+      name: income.name.trim(),
+    })),
+    expenses: expenses.map((expense) => ({
+      ...expense,
+      name: expense.name.trim(),
+    })),
     debts: debts.map((debt) => ({
       id: debt.id,
       name: debt.name.trim(),
+      type: debt.type,
       balance: debt.balance,
       apr: debt.apr,
       minimum_payment: debt.minimum_payment,
     })),
-    extra_monthly_payment: extra,
+    requested_extra_monthly_payment: extra,
     start_month: currentStartMonth(now),
   };
 }
 
-async function post<T>(path: string, body: PayoffPlanRequest, signal: AbortSignal): Promise<T> {
+async function post<T>(path: string, body: unknown, signal: AbortSignal): Promise<T> {
   const response = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -115,13 +136,11 @@ async function post<T>(path: string, body: PayoffPlanRequest, signal: AbortSigna
   return (await response.json()) as T;
 }
 
-/** No `?detail=full`: the summaries and monthly_totals carry everything rendered. */
-export function fetchPlan(body: PayoffPlanRequest, signal: AbortSignal) {
-  return post<PayoffPlanResponse>("/v1/payoff-plans", body, signal);
-}
-
-export function fetchExplanation(body: PayoffPlanRequest, signal: AbortSignal) {
-  return post<ExplainResponse>("/v1/payoff-plans/explain", body, signal);
+export function fetchFinancialReport(
+  body: FinancialReportRequest,
+  signal: AbortSignal,
+) {
+  return post<FinancialReportResponse>("/v1/financial-reports", body, signal);
 }
 
 export function isAbort(error: unknown): boolean {

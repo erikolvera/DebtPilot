@@ -1,253 +1,95 @@
 # DebtPilot
 
-A debt payoff planner. You enter your debts; it computes exactly what the
-snowball and avalanche strategies would cost you, compares both against doing
-nothing, and explains the result in plain language.
+DebtPilot turns a monthly household budget into a realistic debt-payoff plan.
+It calculates:
 
-**Status:** the debt engine is complete and tested. The API, database, and UI
-are not built yet.
-
-## The architecture rule
-
-The engine and the AI layer are separate, and this is not optional.
-
-The **debt engine** is plain Python with no LLM calls. It computes every
-number: balances, interest, months to payoff, total interest paid. It is
-deterministic and covered by unit tests, because a wrong number here is a real
-financial mistake for someone, not a cosmetic bug.
-
-The **AI layer** never calculates anything. It receives already-computed
-figures and turns them into explanations. The engine's `PlanComparison` object
-therefore carries every comparison the model might mention — including the
-subtractions, like "avalanche saves you $3,140 and 7 months" — so the prompt
-only ever says *describe these figures*, never *work out the difference*.
-
-## What the engine does
-
-Three scenarios from one simulator, for any extra monthly payment:
-
-| Scenario | Extra payment | Order | Minimums | Rollover |
-|---|---|---|---|---|
-| **Avalanche** | yes | highest APR first | fixed | yes |
-| **Snowball** | yes | smallest balance first | fixed | yes |
-| **Minimums only** | no | — | declining | no |
-
-The third is the "do nothing differently" baseline. It is what makes the other
-two mean anything, and it is the one figure a user cannot estimate alone.
-
-Design decisions worth knowing before reading the code:
-
-- **Monthly accrual**, interest charged before the payment posts. Slightly
-  understates real daily compounding, so plan figures are presented as
-  estimates.
-- **`Decimal` quantized to cents at every step**, `ROUND_HALF_UP` passed
-  explicitly. Never floats. Every balance is an exact cent value, so "paid
-  off" is exactly `== 0` with no epsilon comparison.
-- **No dates inside the engine** — month indices only, which keeps it a pure
-  function with no hidden clock and makes every test a fixed table of numbers.
-- **Never-paying-off is a result, not an exception.** A user whose avalanche
-  plan clears in four years but who would never escape on minimums alone needs
-  to be told exactly that; raising would fail the request and show them
-  nothing.
-
-Full design: [`docs/superpowers/specs/2026-08-30-debt-engine-design.md`](docs/superpowers/specs/2026-08-30-debt-engine-design.md).
-
-## Layout
-
-```
-backend/app/engine/
-  money.py       cent quantization           interest.py    accrual seam
-  models.py      frozen dataclasses          minimums.py    payment-rule seam
-  errors.py      InvalidDebt                 ordering.py    strategy seam
-  simulator.py   the single month loop
-  plans.py       summaries and comparisons
+```text
+income - living expenses - debt minimums = available monthly cash flow
 ```
 
-`interest`, `minimums`, and `ordering` are injected into `simulate()`, so the
-three scenarios are one loop with different seams — the arithmetic has exactly
-one home. Swapping monthly accrual for daily compounding later means replacing
-one file, not rewriting the simulator.
+If cash flow is negative, the report shows the shortfall and withholds an
+accelerated payoff plan. If it is non-negative, the app compares minimum-only,
+Debt Snowball, and Debt Avalanche estimates using no more extra money than the
+budget supports.
 
-## Running the tests
+## Features
+
+- Multiple take-home and recurring income sources.
+- Categorized monthly expenses.
+- Credit cards, auto loans, personal loans, student loans, medical debt, and
+  other debts.
+- Monthly cash-flow status, debt total, shortfall, and unassigned surplus.
+- Affordability-aware Snowball and Avalanche comparisons.
+- Estimated payoff dates, interest, total paid, and payoff chart.
+- Deterministic next-step recommendations.
+- Automatic browser-local saving; no account or external data connection.
+
+## Architecture
+
+- **Frontend:** Next.js, React, TypeScript, Tailwind CSS.
+- **API:** FastAPI and Pydantic.
+- **Calculations:** framework-free Python packages under `backend/app/engine`
+  and `backend/app/cashflow`.
+- **Storage:** browser `localStorage` only.
+
+The browser posts one financial snapshot to `POST /v1/financial-reports`. The
+API calculates cash flow first, caps the requested extra payment at the
+available amount, and then calls the payoff engine. `POST /v1/payoff-plans`
+remains available as a lower-level debt-only calculation endpoint.
+
+Money crosses the API as decimal strings. The backend uses `Decimal` and rounds
+to cents explicitly; no generative model calculates or recommends anything.
+
+## Run locally
+
+Backend:
 
 ```bash
 cd backend
-python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
-.venv/bin/pytest
-```
-
-109 tests, and the suite fails below 100% line and branch coverage of
-`app/engine`. Four layers, each hunting a different class of bug:
-
-- **Unit tests** per seam.
-- **Golden fixtures** — hand-computed tables. These catch a wrong *premise*
-  (dividing APR by 24 instead of 12 satisfies every invariant while making
-  every number wrong).
-- **Property invariants** (Hypothesis) — money conservation, constant outlay,
-  avalanche never costing more than snowball, and identical results under
-  input shuffling. These catch inconsistency across thousands of portfolios.
-- **A closed-form oracle** — the algebraic amortization formula, derived
-  independently of the loop, agreeing with it within one month.
-
-Both real bugs found during development were caught by these layers rather
-than by review: a payment floor that inflated sub-$25 minimums, and an
-unsound termination check that declared some paying-off portfolios hopeless.
-
-## Running the API
-
-```bash
-cd backend
+python3 -m venv .venv
+.venv/bin/pip install -e ".[dev]"
 .venv/bin/uvicorn app.api.main:app --reload
 ```
 
-Interactive docs at `http://127.0.0.1:8000/docs`; health check at `/health`.
-
-`POST /v1/payoff-plans` takes a portfolio and returns all three scenarios plus
-every precomputed comparison. Add `?detail=full` for the per-debt
-month-by-month schedule. Detailed responses can be large — a minimums-only
-baseline runs for hundreds of months — so each scenario's schedule is cut off
-past `MAX_SCHEDULE_ROWS` per-debt rows, with `schedule_truncated: true`
-saying so; the summary numbers and comparison deltas are never truncated.
-
-Money is a JSON **string** in both directions. JSON has no decimal type, so
-accepting bare numbers would reintroduce floats at the boundary of a
-Decimal-only engine — a number where a string belongs is a 422, not a silent
-coercion. `start_month` (`YYYY-MM`) is required rather than defaulted from the
-server clock, which keeps a response a pure function of its request.
-
-```bash
-curl -X POST http://127.0.0.1:8000/v1/payoff-plans \
-  -H 'content-type: application/json' \
-  -d '{"debts":[{"id":"a","name":"Visa","balance":"2000.00","apr":"24.99","minimum_payment":"50.00"}],
-       "extra_monthly_payment":"200.00","start_month":"2026-09"}'
-```
-
-A portfolio that never pays off comes back as a 200 with
-`"outcome": "never_pays_off"`, not an error. HTTP status describes whether the
-request was answerable, never whether the answer was good news.
-
-### Authenticated endpoints
-
-Signed-in users manage their debts through the API rather than writing to
-Postgres directly, so the money rules live in one place.
-
-```
-POST   /v1/debts             create        GET /v1/debts        list
-PATCH  /v1/debts/{id}        partial edit  DELETE /v1/debts/{id}
-GET    /v1/me/payoff-plan?extra_monthly_payment=200.00&start_month=2026-09
-```
-
-All require a Supabase `Authorization: Bearer <jwt>` header. A user may store
-up to 20 debts, enforced at insert so the payoff route inherits the bound.
-A debt that does not exist — or belongs to someone else — returns 404 rather
-than 403, so the API never confirms a row exists in another account.
-
-Isolation is enforced twice: every query filters on `user_id`, and row-level
-security policies enforce the same rule inside Postgres. **The mechanism that
-does the work is the database role.** The application connects as `app_user`,
-created by the migration with `nosuperuser` and `nobypassrls`; Supabase's
-default `postgres` role has `rolbypassrls = true` and would ignore every
-policy while every test still passed. `FORCE ROW LEVEL SECURITY` is also set,
-which closes the table-owner path, though it is currently redundant because
-the owner is that same bypassing role — it starts mattering if ownership ever
-moves.
-
-The policies call `public.request_user_id()` rather than Supabase's
-`auth.uid()`. Reaching `auth.uid()` from a restricted role requires either a
-grant Postgres silently refuses to make, or membership in Supabase's
-`authenticated` role — which was measured to hand `app_user` read and write
-access to any future table in `public`. Reading the request setting directly
-removes the dependency instead of duplicating it.
-
-Local development needs Docker running and the Supabase CLI:
-
-```bash
-cd backend
-supabase start                    # prints the admin DB URL
-./scripts/bootstrap_local_db.sh   # gives app_user a login for local use
-```
-
-The second step is separate on purpose. The migration creates `app_user` with
-no password, because that file is what `supabase db push` applies to the hosted
-project — a literal there would publish a credential for a role that can
-impersonate any user. Set the production password in the Supabase dashboard.
-
-**Before the first deploy**, confirm your Supabase project issues asymmetric
-tokens: `curl {SUPABASE_URL}/auth/v1/.well-known/jwks.json` should return an EC
-key. Projects still on the legacy shared JWT secret sign with HS256, which this
-code deliberately does not accept.
-
-### Explaining a plan
-
-```
-POST /v1/payoff-plans/explain
-```
-
-Takes the same body as `POST /v1/payoff-plans` and returns
-`{"headline": "...", "body": "...", "source": "model" | "template"}`.
-
-Call it alongside the plan rather than instead of it. The engine answers in
-under a millisecond and a generation call takes seconds, so the client renders
-the plan immediately and fills the prose in when it arrives. An outage costs a
-paragraph, not the plan.
-
-**The narrative never contains a number the engine did not compute.** The
-model returns prose made of `{token}` placeholders and no digits at all; the
-server substitutes values from the comparison. A response containing a digit,
-or a token that does not exist for that request, is rejected — so a wrong
-figure is impossible rather than merely unlikely. Figures the engine cannot
-supply, such as the totals for a portfolio that never pays off, are not
-offered as tokens and therefore cannot be mentioned.
-
-What that guarantees is provenance, not attribution: every figure came from
-the engine, but nothing forces the model to attach the right figure to the
-right claim. A sentence built from real numbers can still pair the wrong one
-with the wrong label. The plan table renders beside the prose for exactly this
-reason -- the numbers are checkable -- and the endpoint claims no more than it
-enforces.
-
-User text never enters the prompt. The model writes `{first_cleared_name}`
-without seeing what the debt is called, so a debt named "Ignore previous
-instructions" has nothing to inject into.
-
-**The response is plain text. Do not render it as HTML.**
-
-With no `GEMINI_API_KEY` set, the endpoint serves a hand-written template —
-correct, deterministic, and the same fallback used in production when Gemini
-is unavailable. Callers are limited to 10 requests per hour per IP, which is a
-speed bump rather than a wall: set a spend limit in the Gemini console. The
-process also refuses more than 200 model calls per hour in total, which is the
-only limit here that bounds cost rather than per-caller frequency.
-
-Behind a proxy, set `TRUST_PROXY_HEADERS=1` so the limiter keys on
-`X-Forwarded-For` rather than on the proxy's own address. Leave it unset
-anywhere the API is reachable directly: the header is caller-controlled, and
-believing it hands an abuser an unlimited supply of buckets.
-
-## Roadmap
-
-- [x] Debt engine
-- [x] Payoff plan API — stateless `POST /v1/payoff-plans`
-- [x] Debts CRUD with persistence (Supabase Auth, Postgres, row-level security)
-- [ ] Supabase Postgres + auth
-- [x] AI guidance — `POST /v1/payoff-plans/explain`
-- [ ] AI follow-up questions (`POST /ask`)
-- [x] Next.js frontend — anonymous calculator
-
-## Running the frontend
+Frontend, in a second terminal:
 
 ```bash
 cd frontend
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-Serves the calculator at `http://localhost:3000`. It talks directly to the
-stateless `POST /v1/payoff-plans` and `POST /v1/payoff-plans/explain`
-endpoints — no sign-in required — so the backend above needs to be running
-too.
+Open `http://localhost:3000`. API documentation is available at
+`http://127.0.0.1:8000/docs`.
 
-`NEXT_PUBLIC_API_BASE_URL` points it at the API; copy `frontend/.env.example`
-to `frontend/.env.local` to override the `http://127.0.0.1:8000` default (see
-`.env.example` for what a deployed preview needs on the backend's
-`ALLOWED_ORIGINS`).
+## Verify
+
+```bash
+cd backend && .venv/bin/pytest
+cd frontend && npm test && npm run typecheck && npm run lint
+NEXT_PUBLIC_API_BASE_URL=https://api.example.invalid npm run build
+```
+
+Frontend types are generated from OpenAPI while the backend is running:
+
+```bash
+cd frontend
+npm run gen:api
+```
+
+## Calculation assumptions
+
+- Interest accrues monthly before payment.
+- Snowball targets the smallest balance; Avalanche targets the highest APR.
+- Strategy payments keep the initial total minimum-payment budget and roll a
+  cleared debt's payment into the next debt.
+- The minimum-only baseline approximates a declining credit-card minimum.
+- Calculations exclude fees, new charges, missed payments, rate changes, and
+  lender-specific daily-interest behavior.
+- Non-credit-card debts currently use the same balance/APR/minimum model, so
+  their estimates may differ more from lender amortization schedules.
+- Runs stop after 1,200 months. A plan that reaches that horizon is shown as
+  not paying off within the model.
+
+These results are planning estimates, not financial advice or lender quotes.

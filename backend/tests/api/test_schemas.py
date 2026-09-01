@@ -164,8 +164,6 @@ def scenario_payload(strategy="avalanche", **overrides) -> dict:
                 "cumulative_interest": "43.20",
             }
         ],
-        "schedule": None,
-        "schedule_truncated": False,
     }
     payload.update(overrides)
     return payload
@@ -253,13 +251,6 @@ def test_a_bool_is_still_rejected_as_money():
 
 
 def test_a_plan_request_rejects_a_blank_or_nul_debt_name():
-    """The same name rules as a stored debt, for a different reason.
-
-    A name on this endpoint is never written to Postgres, so the NUL rule is
-    not about the column. It is substituted into guidance prose, and the
-    containment argument in the design spec claims names arrive NUL-free and
-    non-blank. Before this, that claim was true only of the persisted path.
-    """
     for name in ("   ", "Vi\x00sa"):
         with pytest.raises(ValidationError):
             DebtIn(

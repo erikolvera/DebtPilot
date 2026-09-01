@@ -1,148 +1,191 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { CashFlowSummary } from "@/components/CashFlowSummary";
 import { DebtTable } from "@/components/DebtTable";
 import { EscapeChart, type Track } from "@/components/EscapeChart";
+import { ExpenseTable } from "@/components/ExpenseTable";
 import { ExtraPayment } from "@/components/ExtraPayment";
-import { Narrative } from "@/components/Narrative";
+import { IncomeTable } from "@/components/IncomeTable";
+import { Recommendations } from "@/components/Recommendations";
 import { ScenarioSummary } from "@/components/ScenarioSummary";
-import type { DebtDraft } from "@/lib/api";
-import { delta } from "@/lib/format";
-import { seedPortfolio } from "@/lib/seed";
-import { browserStorage, loadPortfolio, savePortfolio, type Portfolio } from "@/lib/storage";
-import { usePlan } from "@/lib/usePlan";
+import type { ExpenseDraft, FinancialDebtDraft, IncomeDraft } from "@/lib/api";
+import { delta, money } from "@/lib/format";
+import {
+  browserStorage,
+  loadFinancialProfile,
+  saveFinancialProfile,
+  type FinancialProfile,
+} from "@/lib/profileStorage";
+import { seedFinancialProfile } from "@/lib/seed";
+import { useReport } from "@/lib/useReport";
 
 export default function Page() {
-  const [portfolio, setPortfolio] = useState<Portfolio>(seedPortfolio);
+  const [profile, setProfile] = useState<FinancialProfile>(seedFinancialProfile);
   const [restored, setRestored] = useState(false);
 
-  // Restore after mount, never during render: localStorage does not exist on
-  // the server, and reading it during render would mismatch hydration.
   useEffect(() => {
-    // localStorage cannot be read during render without a hydration mismatch,
-    // and the alternatives (lazy initializer, useSyncExternalStore with a
-    // cached snapshot) are respectively wrong and far more machinery than one
-    // extra render on mount is worth.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setPortfolio(loadPortfolio(browserStorage(), seedPortfolio()));
+    setProfile(loadFinancialProfile(browserStorage(), seedFinancialProfile()));
     setRestored(true);
   }, []);
 
   useEffect(() => {
-    if (restored) savePortfolio(browserStorage(), portfolio);
-  }, [portfolio, restored]);
+    if (restored) saveFinancialProfile(browserStorage(), profile);
+  }, [profile, restored]);
 
-  const setDebts = (debts: DebtDraft[]) =>
-    setPortfolio((current) => ({ ...current, debts }));
+  const setIncomes = (incomes: IncomeDraft[]) =>
+    setProfile((current) => ({ ...current, incomes }));
+  const setExpenses = (expenses: ExpenseDraft[]) =>
+    setProfile((current) => ({ ...current, expenses }));
+  const setDebts = (debts: FinancialDebtDraft[]) =>
+    setProfile((current) => ({ ...current, debts }));
   const setExtra = (extra: string) =>
-    setPortfolio((current) => ({ ...current, extra }));
+    setProfile((current) => ({ ...current, extra }));
 
-  const { plan, pending, error } = usePlan(portfolio.debts, portfolio.extra);
-
-  // A plan for a portfolio that no longer exists must not render as the current
-  // one. usePlan deliberately keeps the last good plan through a mid-edit, which
-  // is right while cards exist and wrong once they do not.
-  const shownPlan = portfolio.debts.length === 0 ? null : plan;
+  const { report, pending, stale, error } = useReport(
+    profile.incomes,
+    profile.expenses,
+    profile.debts,
+    profile.extra,
+  );
+  const plan = report?.payoff_plan ?? null;
 
   const nameFor = useMemo(() => {
-    const byId = new Map(
-      portfolio.debts.map((debt) => [debt.id, debt.name.trim() || "that card"]),
+    const names = new Map(
+      profile.debts.map((debt) => [debt.id, debt.name.trim() || "that debt"]),
     );
-    return (debtId: string) => byId.get(debtId) ?? "a card";
-  }, [portfolio.debts]);
+    return (debtId: string) => names.get(debtId) ?? "a debt";
+  }, [profile.debts]);
 
-  const tracks: Track[] = shownPlan
+  const tracks: Track[] = plan
     ? [
-        { key: "baseline", label: "Do nothing", accent: "var(--baseline)", scenario: shownPlan.scenarios.baseline },
-        { key: "snowball", label: "Snowball", accent: "var(--snowball)", scenario: shownPlan.scenarios.snowball },
-        { key: "avalanche", label: "Avalanche", accent: "var(--avalanche)", scenario: shownPlan.scenarios.avalanche },
+        { key: "baseline", label: "Minimums only", accent: "var(--baseline)", scenario: plan.scenarios.baseline },
+        { key: "snowball", label: "Snowball", accent: "var(--snowball)", scenario: plan.scenarios.snowball },
+        { key: "avalanche", label: "Avalanche", accent: "var(--avalanche)", scenario: plan.scenarios.avalanche },
       ]
     : [];
 
   return (
-    <main className="mx-auto max-w-[1180px] px-6 py-12 lg:px-10">
-      <header className="max-w-2xl">
+    <main className="mx-auto max-w-[1280px] px-5 py-10 sm:px-8 lg:px-10 lg:py-14">
+      <header className="max-w-3xl">
         <p className="eyebrow">DebtPilot</p>
-        <h1 className="mt-3 font-display text-[clamp(2.5rem,6vw,4.5rem)] font-bold leading-[0.95] tracking-tight">
-          Find your last payment.
+        <h1 className="mt-3 font-display text-[clamp(2.5rem,6vw,4.75rem)] font-bold leading-[0.95] tracking-tight">
+          Build a payoff plan your budget can actually carry.
         </h1>
-        <p className="mt-5 text-lg text-ink-soft">
-          Enter your cards. See what minimum payments really cost, and what
-          paying a little more buys back.
+        <p className="mt-5 max-w-2xl text-lg text-ink-soft">
+          Add monthly income, living expenses, and debts. DebtPilot calculates
+          the cash left after minimums before comparing payoff strategies.
         </p>
       </header>
 
-      <div className="mt-14 grid gap-12 lg:grid-cols-[380px_1fr] lg:gap-16">
-        <div>
-          <DebtTable debts={portfolio.debts} onChange={setDebts} />
-          <ExtraPayment value={portfolio.extra} onChange={setExtra} />
-          <p className="mt-8 text-xs text-ink-soft">
-            These numbers are an example. Change any of them — nothing is saved
-            beyond this browser.
+      <div className="mt-14 grid gap-14 lg:grid-cols-[460px_1fr] lg:gap-16">
+        <div className="space-y-12">
+          <IncomeTable incomes={profile.incomes} onChange={setIncomes} />
+          <ExpenseTable expenses={profile.expenses} onChange={setExpenses} />
+          <DebtTable debts={profile.debts} onChange={setDebts} />
+          <ExtraPayment
+            value={profile.extra}
+            onChange={setExtra}
+            maximumAffordable={report?.cash_flow.maximum_affordable_extra_payment}
+            plannedExtra={report?.debt_payment_budget.planned_extra_monthly_payment}
+            isAffordable={report?.debt_payment_budget.is_affordable}
+          />
+          <p className="text-xs leading-relaxed text-ink-soft">
+            Your entries stay in this browser. Payoff dates are estimates and
+            may differ from lender statements, especially for installment loans.
           </p>
         </div>
 
-        <div>
+        <div aria-live="polite">
           {error !== null && (
             <p role="status" className="mb-6 border-l-2 border-snowball pl-3 text-sm">
               {error}
             </p>
           )}
 
-          {shownPlan === null ? (
+          {report === null ? (
             <p className="text-ink-soft">
-              {portfolio.debts.length === 0
-                ? "Add a card to see your payoff date."
-                : error !== null
-                  ? "No plan yet — the planner didn't answer."
-                  : pending
-                    ? "Working out your plan…"
-                    : "Fix the highlighted fields above and the plan will update."}
+              {pending
+                ? "Calculating your financial report…"
+                : "Complete or fix the highlighted entries to calculate your report."}
             </p>
           ) : (
-            <>
-              <h2 className="eyebrow">How it plays out</h2>
-              <div className="mt-6">
-                <EscapeChart
-                  tracks={tracks}
-                  startMonth={shownPlan.start_month}
-                  dimmed={pending}
-                />
-              </div>
-
-              <div className="mt-12 grid gap-8 sm:grid-cols-3">
-                <ScenarioSummary
-                  scenario={shownPlan.scenarios.baseline}
-                  label="Do nothing"
-                  accent="var(--baseline)"
-                  nameFor={nameFor}
-                  note={null}
-                />
-                <ScenarioSummary
-                  scenario={shownPlan.scenarios.snowball}
-                  label="Snowball"
-                  accent="var(--snowball)"
-                  nameFor={nameFor}
-                  note="Smallest balance first."
-                />
-                <ScenarioSummary
-                  scenario={shownPlan.scenarios.avalanche}
-                  label="Avalanche"
-                  accent="var(--avalanche)"
-                  nameFor={nameFor}
-                  note={
-                    shownPlan.comparison.interest_saved_avalanche_vs_snowball === null
-                      ? "Highest rate first."
-                      : `Highest rate first. ${delta(shownPlan.comparison.interest_saved_avalanche_vs_snowball)} less interest than snowball.`
-                  }
-                />
-              </div>
-
-              <Narrative
-                debts={portfolio.debts}
-                extra={portfolio.extra}
+            <div className="space-y-14">
+              <CashFlowSummary
+                totalMonthlyIncome={report.cash_flow.total_monthly_income}
+                totalMonthlyExpenses={report.cash_flow.total_monthly_expenses}
+                totalMinimumDebtPayments={report.cash_flow.total_minimum_debt_payments}
+                availableMonthlyCashFlow={report.cash_flow.available_monthly_cash_flow}
+                shortfall={report.cash_flow.shortfall}
+                totalDebt={report.total_debt}
+                status={report.cash_flow.status}
+                stale={stale}
               />
-            </>
+
+              <section aria-labelledby="payment-budget-heading" className="border-t border-rule pt-5">
+                <h2 id="payment-budget-heading" className="eyebrow">Debt payment budget</h2>
+                {report.cash_flow.status === "deficit" ? (
+                  <p className="mt-4 max-w-prose text-lg leading-relaxed">
+                    Income falls short by <span className="tnum font-medium">{money(report.cash_flow.shortfall)}</span> each month.
+                    An accelerated payoff plan would not be realistic yet.
+                  </p>
+                ) : (
+                  <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-3">
+                    <div>
+                      <dt className="text-ink-soft">Available after minimums</dt>
+                      <dd className="tnum mt-1 text-xl">{money(report.cash_flow.maximum_affordable_extra_payment)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-soft">Used in the plan</dt>
+                      <dd className="tnum mt-1 text-xl">{money(report.debt_payment_budget.planned_extra_monthly_payment)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-ink-soft">Left unassigned</dt>
+                      <dd className="tnum mt-1 text-xl">{money(report.debt_payment_budget.unallocated_cash_flow)}</dd>
+                    </div>
+                  </dl>
+                )}
+              </section>
+
+              {plan === null ? (
+                <section aria-labelledby="payoff-heading" className="border-t border-rule pt-5">
+                  <h2 id="payoff-heading" className="eyebrow">Payoff strategies</h2>
+                  <p className="mt-4 text-ink-soft">
+                    {report.cash_flow.status === "deficit"
+                      ? "Close the monthly shortfall before choosing Snowball or Avalanche."
+                      : "Add a debt balance to compare payoff strategies."}
+                  </p>
+                </section>
+              ) : (
+                <section aria-labelledby="payoff-heading">
+                  <h2 id="payoff-heading" className="eyebrow">Estimated payoff</h2>
+                  <div className="mt-6">
+                    <EscapeChart tracks={tracks} startMonth={plan.start_month} dimmed={pending || stale} />
+                  </div>
+                  <div className="mt-12 grid gap-8 sm:grid-cols-3">
+                    <ScenarioSummary scenario={plan.scenarios.baseline} label="Minimums only" accent="var(--baseline)" nameFor={nameFor} note="Minimum payments decline with the balance." />
+                    <ScenarioSummary scenario={plan.scenarios.snowball} label="Snowball" accent="var(--snowball)" nameFor={nameFor} note="Smallest balance first." />
+                    <ScenarioSummary
+                      scenario={plan.scenarios.avalanche}
+                      label="Avalanche"
+                      accent="var(--avalanche)"
+                      nameFor={nameFor}
+                      note={
+                        plan.comparison.interest_saved_avalanche_vs_snowball === null
+                          ? "Highest rate first."
+                          : `Highest rate first. ${delta(plan.comparison.interest_saved_avalanche_vs_snowball)} less estimated interest than Snowball.`
+                      }
+                    />
+                  </div>
+                  <p className="mt-8 max-w-prose text-xs leading-relaxed text-ink-soft">
+                    {report.estimate_disclosure}
+                  </p>
+                </section>
+              )}
+
+              <Recommendations items={report.recommendations} />
+            </div>
           )}
         </div>
       </div>

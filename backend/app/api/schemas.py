@@ -7,14 +7,33 @@ Coupling them would turn an engine field rename into a silent breaking API
 change; keeping them apart makes such a rename show up as a diff in this file.
 """
 
-import uuid
-from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
 from .dates import MONTH_PATTERN
+
+DebtType = Literal[
+    "credit_card",
+    "auto_loan",
+    "personal_loan",
+    "student_loan",
+    "medical_debt",
+    "other",
+]
+ExpenseCategory = Literal[
+    "housing",
+    "food",
+    "utilities",
+    "transportation",
+    "insurance",
+    "healthcare",
+    "childcare",
+    "subscriptions",
+    "personal",
+    "other",
+]
 
 
 def _reject_json_numbers(value: Any) -> Any:
@@ -43,11 +62,7 @@ Money = Annotated[
     Decimal, BeforeValidator(_reject_json_numbers, json_schema_input_type=str)
 ]
 
-# The ceiling on every money field. Without an upper bound a well-formed
-# request like {"balance": "1e1000"} passes validation, reaches the engine,
-# and raises decimal.InvalidOperation out of `to_cents` — not an InvalidDebt,
-# so it escapes the handler as an unhandled 500. The value matches the
-# eventual numeric(10,2) column exactly, the way `apr` matches numeric(5,2).
+# Keep extreme but valid Decimal inputs from overwhelming the simulator.
 MONEY_MAX = Decimal("99999999.99")
 
 
@@ -55,18 +70,9 @@ MAX_DEBTS_PER_USER = 20
 
 
 def _non_blank(value: Any) -> Any:
-    """Strip, then require content.
-
-    The column's CHECK is `length(trim(name)) between 1 and 120`. Pydantic's
-    `min_length` alone accepts "   ", which passes validation and then
-    violates the constraint as an unhandled IntegrityError -- a 500 from a
-    well-formed request. Stripping here keeps the two layers agreeing on what
-    "empty" means.
-    """
+    """Strip names and reject blank or unsafe text."""
     if isinstance(value, str):
         if "\x00" in value:
-            # Postgres text columns cannot hold NUL, and psycopg raises on the
-            # way in -- a 500 from a request that otherwise validates.
             raise ValueError("must not contain NUL bytes")
         stripped = value.strip()
         if not stripped:
@@ -84,10 +90,6 @@ class DebtIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1, max_length=64)
-    # NonBlankName, not a bare length-bounded str: this name is substituted
-    # into guidance prose, and the containment argument in the design spec
-    # depends on it arriving NUL-free and non-blank. A whitespace-only name
-    # would also render as an empty debt in a sentence.
     name: NonBlankName
     balance: Money = Field(ge=0, le=MONEY_MAX)
     apr: Money = Field(ge=0, le=Decimal("999.99"), decimal_places=2)
@@ -97,10 +99,7 @@ class DebtIn(BaseModel):
 class PayoffPlanRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # The 20-debt cap is a denial-of-service bound, not a product limit:
-    # one measured 50-debt ?detail=full request produced a 16.7 MB body,
-    # ~2.6s of CPU and 215 MB of peak RSS, on an endpoint with no auth.
-    debts: list[DebtIn] = Field(max_length=20)
+    debts: list[DebtIn] = Field(max_length=MAX_DEBTS_PER_USER)
     extra_monthly_payment: Money = Field(ge=0, le=MONEY_MAX)
     start_month: str = Field(pattern=MONTH_PATTERN)
 
@@ -122,23 +121,6 @@ class MonthlyTotalOut(BaseModel):
     cumulative_interest: Money
 
 
-class DebtMonthOut(BaseModel):
-    debt_id: str
-    starting_balance: Money
-    interest_charged: Money
-    payment_applied: Money
-    ending_balance: Money
-
-
-class MonthOut(BaseModel):
-    month_number: int
-    month: str
-    debts: list[DebtMonthOut]
-    total_payment: Money
-    total_interest: Money
-    remaining_balance: Money
-
-
 class ScenarioOut(BaseModel):
     strategy: Literal["snowball", "avalanche", "minimum_only"]
     outcome: Literal["paid_off", "never_pays_off"]
@@ -149,11 +131,6 @@ class ScenarioOut(BaseModel):
     total_paid: Money
     debt_payoffs: list[DebtPayoffOut]
     monthly_totals: list[MonthlyTotalOut]
-    schedule: list[MonthOut] | None
-    # True only when `schedule` was requested and months were dropped to stay
-    # under MAX_SCHEDULE_ROWS. A client that would otherwise read a short
-    # schedule as a short plan needs to be told the difference.
-    schedule_truncated: bool
 
 
 class ScenariosOut(BaseModel):
@@ -166,12 +143,7 @@ class ScenariosOut(BaseModel):
 
 
 class ComparisonOut(BaseModel):
-    """Every delta the AI layer is permitted to state.
-
-    Nullable throughout, because you cannot subtract from a plan that never
-    pays off. A delta omitted here is a delta the model would compute in
-    prose, which is the exact failure the engine/AI split exists to prevent.
-    """
+    """Precomputed strategy differences; null when a plan never pays off."""
 
     interest_saved_snowball_vs_baseline: Money | None
     interest_saved_avalanche_vs_baseline: Money | None
@@ -189,76 +161,85 @@ class PayoffPlanResponse(BaseModel):
     comparison: ComparisonOut
 
 
-class DebtCreate(BaseModel):
-    """A new debt.
-
-    No `id` -- the database generates it -- and no `user_id`, which comes from
-    the verified token and never from the body. Accepting `user_id` from a
-    request body is how a caller writes into someone else's account.
-    """
-
+class IncomeIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    id: str = Field(min_length=1, max_length=64)
     name: NonBlankName
-    type: str = Field(default="credit_card", min_length=1, max_length=40)
-    balance: Money = Field(ge=0, le=MONEY_MAX, decimal_places=2)
-    apr: Money = Field(ge=0, le=Decimal("999.99"), decimal_places=2)
-    minimum_payment: Money = Field(ge=0, le=MONEY_MAX, decimal_places=2)
+    monthly_amount: Money = Field(ge=0, le=MONEY_MAX)
 
 
-class DebtUpdate(BaseModel):
-    """A partial update. Every field optional, but not all of them at once."""
-
+class ExpenseIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    name: NonBlankName | None = None
-    type: str | None = Field(default=None, min_length=1, max_length=40)
-    balance: Money | None = Field(
-        default=None, ge=0, le=MONEY_MAX, decimal_places=2
-    )
-    apr: Money | None = Field(
-        default=None, ge=0, le=Decimal("999.99"), decimal_places=2
-    )
-    minimum_payment: Money | None = Field(
-        default=None, ge=0, le=MONEY_MAX, decimal_places=2
-    )
+    id: str = Field(min_length=1, max_length=64)
+    name: NonBlankName
+    category: ExpenseCategory
+    monthly_amount: Money = Field(ge=0, le=MONEY_MAX)
+
+
+class FinancialReportDebtIn(DebtIn):
+    type: DebtType = "credit_card"
+
+
+class FinancialReportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    incomes: list[IncomeIn] = Field(max_length=50)
+    expenses: list[ExpenseIn] = Field(max_length=100)
+    debts: list[FinancialReportDebtIn] = Field(max_length=MAX_DEBTS_PER_USER)
+    requested_extra_monthly_payment: Money = Field(ge=0, le=MONEY_MAX)
+    start_month: str = Field(pattern=MONTH_PATTERN)
 
     @model_validator(mode="after")
-    def _at_least_one_field(self) -> "DebtUpdate":
-        if not self.model_dump(exclude_none=True):
-            raise ValueError("at least one field must be supplied")
+    def _unique_ids(self) -> "FinancialReportRequest":
+        for label, rows in (
+            ("income", self.incomes),
+            ("expense", self.expenses),
+            ("debt", self.debts),
+        ):
+            ids = [row.id for row in rows]
+            if len(ids) != len(set(ids)):
+                raise ValueError(f"duplicate {label} id")
         return self
 
 
-class DebtOut(BaseModel):
-    """A stored debt on the wire.
-
-    `id` is a UUID rather than a str: the database returns a UUID object and
-    Pydantic does not coerce it to str, so typing it correctly here is what
-    lets a row map straight onto this model. It still serializes to a JSON
-    string, so the wire contract is unchanged.
-    """
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    name: str
-    type: str
-    balance: Money
-    apr: Money
-    minimum_payment: Money
-    created_at: datetime
-    updated_at: datetime
+class CashFlowOut(BaseModel):
+    total_monthly_income: Money
+    total_monthly_expenses: Money
+    total_minimum_debt_payments: Money
+    available_monthly_cash_flow: Money
+    shortfall: Money
+    maximum_affordable_extra_payment: Money
+    status: Literal["deficit", "break_even", "surplus"]
 
 
-class ExplainResponse(BaseModel):
-    """A narrative of a payoff comparison.
+class DebtPaymentBudgetOut(BaseModel):
+    requested_extra_monthly_payment: Money
+    planned_extra_monthly_payment: Money
+    unallocated_cash_flow: Money
+    extra_payment_gap: Money
+    is_affordable: bool
 
-    `source` reports which provider served it. A client that cannot tell
-    whether it received generated prose or the deterministic fallback cannot
-    decide whether to label it, and silently degrading should be visible.
-    """
 
-    headline: str
-    body: str
-    source: Literal["model", "template"]
+class RecommendationOut(BaseModel):
+    code: Literal[
+        "close_shortfall",
+        "protect_minimums",
+        "reduce_extra_payment",
+        "compare_strategies",
+        "assign_remaining_surplus",
+        "build_cash_reserve",
+    ]
+    title: str
+    detail: str
+
+
+class FinancialReportResponse(BaseModel):
+    start_month: str
+    total_debt: Money
+    cash_flow: CashFlowOut
+    debt_payment_budget: DebtPaymentBudgetOut
+    payoff_plan: PayoffPlanResponse | None
+    recommendations: list[RecommendationOut]
+    estimate_disclosure: str

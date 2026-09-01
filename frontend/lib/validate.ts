@@ -1,4 +1,9 @@
-import type { DebtDraft } from "./api";
+import type {
+  DebtDraft,
+  ExpenseDraft,
+  FinancialDebtDraft,
+  IncomeDraft,
+} from "./api";
 
 /**
  * Client-side validation, mirroring the server's bounds.
@@ -18,6 +23,18 @@ const APR_MAX = 999.99;
 /** Mirrors the server's MAX_DEBTS_PER_USER. */
 export const MAX_DEBTS = 20;
 const MAX_NAME = 120;
+const EXPENSE_CATEGORIES = new Set([
+  "housing",
+  "food",
+  "utilities",
+  "transportation",
+  "insurance",
+  "healthcare",
+  "childcare",
+  "subscriptions",
+  "personal",
+  "other",
+]);
 
 function moneyError(value: string, max: number, label: string): string | undefined {
   if (!DECIMAL.test(value)) return `${label} must be a plain amount, like 1200.50`;
@@ -55,4 +72,40 @@ export function isSendable(debts: DebtDraft[], extra: string): boolean {
   if (debts.length === 0 || debts.length > MAX_DEBTS) return false;
   if (extraError(extra) !== null) return false;
   return debts.every((debt) => Object.keys(debtErrors(debt)).length === 0);
+}
+
+function namedAmountIsValid(row: { name: string; monthly_amount: string }): boolean {
+  const name = row.name.trim();
+  return (
+    name.length > 0 &&
+    name.length <= MAX_NAME &&
+    moneyError(row.monthly_amount, MONEY_MAX, "Amount") === undefined
+  );
+}
+
+function idsAreUnique(rows: Array<{ id: string }>): boolean {
+  return new Set(rows.map((row) => row.id)).size === rows.length;
+}
+
+export function isFinancialReportSendable(
+  incomes: IncomeDraft[],
+  expenses: ExpenseDraft[],
+  debts: FinancialDebtDraft[],
+  extra: string,
+): boolean {
+  if (incomes.length > 50 || expenses.length > 100 || debts.length > MAX_DEBTS) {
+    return false;
+  }
+  if (extraError(extra) !== null) return false;
+  if (!idsAreUnique(incomes) || !idsAreUnique(expenses) || !idsAreUnique(debts)) {
+    return false;
+  }
+  return (
+    incomes.every(namedAmountIsValid) &&
+    expenses.every(
+      (expense) =>
+        namedAmountIsValid(expense) && EXPENSE_CATEGORIES.has(expense.category),
+    ) &&
+    debts.every((debt) => Object.keys(debtErrors(debt)).length === 0)
+  );
 }

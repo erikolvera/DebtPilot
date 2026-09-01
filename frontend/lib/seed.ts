@@ -1,27 +1,38 @@
-import type { DebtDraft } from "./api";
+import type {
+  ExpenseDraft,
+  FinancialDebtDraft,
+  IncomeDraft,
+} from "./api";
 
-/**
- * The portfolio the page loads with, marked in the UI as an example.
- *
- * These numbers are a design decision, not filler. The Visa's 2% minimum sits
- * just under its 2.0825% monthly interest, so the minimums-only baseline never
- * pays off — which is the only reason the signature element (a track that runs
- * off the axis and never ends) is visible on first paint. Verified against the
- * engine; figures are recorded in spec §7.
- *
- * Ids are literal rather than generated so those recorded figures stay
- * reproducible. Rows the user adds get crypto.randomUUID().
- */
-const SEED_DEBTS: DebtDraft[] = [
-  { id: "visa", name: "Visa Signature", balance: "6120.00", apr: "24.99", minimum_payment: "122.40" },
-  { id: "store", name: "Store card", balance: "1840.00", apr: "27.99", minimum_payment: "46.00" },
-  { id: "credit", name: "Credit union", balance: "3250.00", apr: "14.50", minimum_payment: "65.00" },
+const SEED_DEBTS: FinancialDebtDraft[] = [
+  { id: "visa", name: "Visa Signature", type: "credit_card", balance: "6120.00", apr: "24.99", minimum_payment: "122.40" },
+  { id: "store", name: "Store card", type: "credit_card", balance: "1840.00", apr: "27.99", minimum_payment: "46.00" },
+  { id: "credit", name: "Credit union", type: "personal_loan", balance: "3250.00", apr: "14.50", minimum_payment: "65.00" },
 ];
-
-export const DEFAULT_EXTRA = "200.00";
 
 export const EXTRA_SLIDER_MAX = 1000;
 
-export function seedPortfolio() {
-  return { debts: SEED_DEBTS.map((debt) => ({ ...debt })), extra: DEFAULT_EXTRA };
+const SEED_INCOMES: IncomeDraft[] = [
+  { id: "paycheck", name: "Take-home pay", monthly_amount: "5000.00" },
+  { id: "recurring", name: "Recurring side income", monthly_amount: "300.00" },
+];
+
+const SEED_EXPENSES: ExpenseDraft[] = [
+  { id: "housing", name: "Rent", category: "housing", monthly_amount: "1700.00" },
+  { id: "food", name: "Groceries", category: "food", monthly_amount: "600.00" },
+  { id: "utilities", name: "Utilities", category: "utilities", monthly_amount: "300.00" },
+  { id: "transport", name: "Transportation", category: "transportation", monthly_amount: "450.00" },
+  { id: "insurance", name: "Insurance", category: "insurance", monthly_amount: "350.00" },
+  { id: "health", name: "Healthcare", category: "healthcare", monthly_amount: "150.00" },
+  { id: "subscriptions", name: "Subscriptions", category: "subscriptions", monthly_amount: "100.00" },
+  { id: "personal", name: "Personal and other", category: "personal", monthly_amount: "300.00" },
+];
+
+export function seedFinancialProfile() {
+  return {
+    incomes: SEED_INCOMES.map((row) => ({ ...row })),
+    expenses: SEED_EXPENSES.map((row) => ({ ...row })),
+    debts: SEED_DEBTS.map((row) => ({ ...row })),
+    extra: "650.00",
+  };
 }

@@ -1,14 +1,18 @@
 "use client";
 
 import { EXTRA_SLIDER_MAX } from "@/lib/seed";
+import { money } from "@/lib/format";
 import { extraError } from "@/lib/validate";
 
 type Props = {
   value: string;
   onChange: (extra: string) => void;
+  maximumAffordable?: string;
+  plannedExtra?: string;
+  isAffordable?: boolean;
 };
 
-export function ExtraPayment({ value, onChange }: Props) {
+export function ExtraPayment({ value, onChange, maximumAffordable, plannedExtra, isAffordable }: Props) {
   const error = extraError(value);
   const invalid = error !== null;
   // The one place a money value becomes a number: a range input's value is
@@ -19,7 +23,7 @@ export function ExtraPayment({ value, onChange }: Props) {
   return (
     <section aria-labelledby="extra-heading" className="mt-10">
       <h2 id="extra-heading" className="eyebrow">
-        Extra each month
+        Extra toward debt
       </h2>
 
       <div className="mt-3 flex items-baseline gap-2">
@@ -49,8 +53,17 @@ export function ExtraPayment({ value, onChange }: Props) {
       {error !== null && <p className="mt-2 text-xs text-ink-soft">{error}</p>}
 
       <p className="mt-2 text-xs text-ink-soft">
-        On top of every minimum. Drag to see what it buys back.
+        On top of every minimum. The report never models more than your
+        available monthly cash.
       </p>
+      {maximumAffordable !== undefined && (
+        <p className="mt-2 text-xs text-ink-soft">
+          Budget supports up to {money(maximumAffordable)}.
+          {isAffordable === false && plannedExtra !== undefined && (
+            <> The payoff plan uses {money(plannedExtra)} instead.</>
+          )}
+        </p>
+      )}
     </section>
   );
 }

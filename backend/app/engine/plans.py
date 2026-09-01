@@ -141,9 +141,5 @@ def summarize_schedules(
 
 
 def compute_plans(debts: Sequence[Debt], extra_payment: Decimal) -> PlanComparison:
-    """Run all three scenarios and precompute every comparison.
-
-    The deltas exist so the AI layer never performs arithmetic: every number
-    that could appear in a generated sentence is already a field here.
-    """
+    """Run all three scenarios and precompute every comparison."""
     return summarize_schedules(compute_schedules(debts, extra_payment), debts)

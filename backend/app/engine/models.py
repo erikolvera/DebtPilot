@@ -136,13 +136,7 @@ class PlanSummary:
 
 @dataclass(frozen=True)
 class PlanComparison:
-    """All three scenarios plus every delta the AI layer is allowed to state.
-
-    Verbose on purpose. Every number that could appear in a sentence the model
-    writes must already exist as a field here, so the prompt says "describe
-    these figures" rather than "work out the difference". Deltas are nullable
-    because you cannot subtract from a plan that never pays off.
-    """
+    """All three scenarios and their precomputed, nullable differences."""
 
     snowball: PlanSummary
     avalanche: PlanSummary

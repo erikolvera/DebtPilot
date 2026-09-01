@@ -11,24 +11,11 @@ jobs:
     defaults:
       run:
         working-directory: backend
-    env:
-      SUPABASE_URL: https://test.supabase.co
-      DATABASE_URL: postgresql+psycopg://app_user:app_user@127.0.0.1:54322/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: supabase/setup-cli@v1
-        with:
-          # Must match the CLI that generated backend/supabase/config.toml.
-          # An older pin fails with 'invalid keys' on config written by a
-          # newer CLI, which is exactly how this pin broke the build once.
-          version: 2.116.0
-      - name: Start Supabase
-        run: supabase start
-      - name: Grant the app role a login
-        run: ./scripts/bootstrap_local_db.sh
       - name: Install
         run: pip install -e ".[dev]"
       - name: Test with coverage gate

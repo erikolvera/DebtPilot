@@ -26,9 +26,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DebtPilot — find your last payment",
+  title: "DebtPilot — a debt plan your budget can support",
   description:
-    "Enter your cards and see what minimum payments really cost, and what paying a little more buys back.",
+    "Turn monthly income, expenses, and debts into an affordable payoff plan.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,7 +1,14 @@
+import asyncio
+
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api.main import MAX_BODY_BYTES, allowed_origins, create_app
+from app.api.main import (
+    MAX_BODY_BYTES,
+    BodySizeLimitMiddleware,
+    allowed_origins,
+    create_app,
+)
 
 
 @pytest.fixture
@@ -82,11 +89,6 @@ def test_comparison_carries_every_delta(client):
         "months_saved_avalanche_vs_baseline",
         "months_saved_avalanche_vs_snowball",
     }
-
-
-def test_schedule_is_omitted_by_default(client):
-    body = client.post("/v1/payoff-plans", json=portfolio_body()).json()
-    assert body["scenarios"]["avalanche"]["schedule"] is None
 
 
 def test_empty_portfolio_returns_zero_month_scenarios(client):
@@ -173,54 +175,6 @@ def test_never_pays_off_returns_200_not_an_error(client):
     assert payload["comparison"]["interest_saved_avalanche_vs_baseline"] is None
 
 
-def test_detail_full_includes_the_per_debt_schedule(client):
-    body = client.post("/v1/payoff-plans?detail=full", json=portfolio_body()).json()
-    schedule = body["scenarios"]["avalanche"]["schedule"]
-    assert schedule is not None
-    assert schedule[0]["month_number"] == 1
-    assert schedule[0]["month"] == "2026-09"
-    assert {row["debt_id"] for row in schedule[0]["debts"]} == {"a", "b"}
-
-
-def test_detail_full_covers_all_three_scenarios(client):
-    body = client.post("/v1/payoff-plans?detail=full", json=portfolio_body()).json()
-    for name in ("snowball", "avalanche", "baseline"):
-        assert body["scenarios"][name]["schedule"] is not None
-
-
-def test_detail_full_schedule_rows_are_money_strings(client):
-    body = client.post("/v1/payoff-plans?detail=full", json=portfolio_body()).json()
-    row = body["scenarios"]["avalanche"]["schedule"][0]["debts"][0]
-    assert isinstance(row["interest_charged"], str)
-    assert isinstance(row["ending_balance"], str)
-
-
-def test_detail_full_and_default_agree_on_every_summary_number(client):
-    default = client.post("/v1/payoff-plans", json=portfolio_body()).json()
-    detailed = client.post("/v1/payoff-plans?detail=full", json=portfolio_body()).json()
-    for name in ("snowball", "avalanche", "baseline"):
-        a, b = default["scenarios"][name], detailed["scenarios"][name]
-        assert a["months_to_payoff"] == b["months_to_payoff"]
-        assert a["total_interest_paid"] == b["total_interest_paid"]
-        assert a["total_paid"] == b["total_paid"]
-    assert default["comparison"] == detailed["comparison"]
-
-
-def test_a_misspelled_detail_value_is_a_422(client):
-    # ?detail=fill must not quietly return a summary.
-    assert client.post("/v1/payoff-plans?detail=fill", json=portfolio_body()).status_code == 422
-
-
-def test_the_baseline_schedule_is_long(client):
-    # The reason detail is opt-in: a minimums-only baseline can run for
-    # hundreds of months, and serializing three of those by default would be
-    # a payload the UI mostly discards.
-    body = client.post("/v1/payoff-plans?detail=full", json=portfolio_body()).json()
-    assert len(body["scenarios"]["baseline"]["schedule"]) > len(
-        body["scenarios"]["avalanche"]["schedule"]
-    )
-
-
 def test_cors_does_not_advertise_credentialed_requests(monkeypatch):
     # There is no auth and no cookie in this slice, so allow_credentials would
     # grant nothing today and become a footgun the moment ALLOWED_ORIGINS=*.
@@ -231,20 +185,18 @@ def test_cors_does_not_advertise_credentialed_requests(monkeypatch):
 
 
 def test_cors_preflight_allows_every_verb_the_api_serves(monkeypatch):
-    # PATCH and DELETE were added with the debts routes; omitting them here
-    # would leave the browser unable to call edit or delete cross-origin,
-    # which no same-origin TestClient test would ever notice.
+    # The anonymous API serves only reads and calculations.
     monkeypatch.setenv("ALLOWED_ORIGINS", "https://app.example")
     client = TestClient(create_app())
     response = client.options(
         "/v1/debts",
         headers={
             "Origin": "https://app.example",
-            "Access-Control-Request-Method": "PATCH",
+            "Access-Control-Request-Method": "POST",
         },
     )
     allowed = response.headers["access-control-allow-methods"]
-    for verb in ("GET", "POST", "PATCH", "DELETE"):
+    for verb in ("GET", "POST"):
         assert verb in allowed
 
 
@@ -267,6 +219,39 @@ def test_a_body_under_the_size_cap_is_processed_normally(client):
     response = client.post("/v1/payoff-plans", json=portfolio_body())
     assert response.status_code == 200
     assert int(response.request.headers["content-length"]) <= MAX_BODY_BYTES
+
+
+def test_a_chunked_body_over_the_size_cap_is_a_413_before_the_app_runs():
+    downstream_called = False
+    sent = []
+    chunks = iter(
+        [
+            {"type": "http.request", "body": b"x" * MAX_BODY_BYTES, "more_body": True},
+            {"type": "http.request", "body": b"x", "more_body": False},
+        ]
+    )
+
+    async def downstream(scope, receive, send):
+        nonlocal downstream_called
+        downstream_called = True
+
+    async def receive():
+        return next(chunks)
+
+    async def send(message):
+        sent.append(message)
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/v1/payoff-plans",
+        "headers": [],
+    }
+    asyncio.run(BodySizeLimitMiddleware(downstream)(scope, receive, send))
+
+    assert not downstream_called
+    assert sent[0]["type"] == "http.response.start"
+    assert sent[0]["status"] == 413
 
 
 def test_a_request_with_no_content_length_is_not_rejected(client):

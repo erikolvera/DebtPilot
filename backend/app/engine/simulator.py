@@ -7,13 +7,20 @@ rounding bug, and a near-certainty that a fix lands in only two of them.
 """
 
 from collections.abc import Callable, Mapping, Sequence
-from decimal import Decimal
+from decimal import Decimal, localcontext
 
 from .interest import monthly_interest
 from .models import Debt, DebtMonth, Month, Outcome, Schedule, validate_portfolio
 from .money import to_cents
 
 MAX_MONTHS = 1200
+# The public contract permits balances through numeric(10,2) and APRs through
+# numeric(5,2). At the extreme, 1,200 months of negative amortization grows to
+# roughly 325 digits. Python's default Decimal precision is 28, which cannot
+# even quantize that value to cents. Keep the extra precision local to a run:
+# changing the process-wide context would make this library alter unrelated
+# financial calculations in other threads.
+SIMULATION_PRECISION = 512
 ZERO = Decimal("0.00")
 
 OrderFn = Callable[[Sequence[Debt], Mapping[str, Decimal]], tuple[Debt, ...]]
@@ -54,7 +61,20 @@ def simulate(
     minimum_rule: MinimumRule,
     rollover: bool = True,
 ) -> Schedule:
-    """Step month by month until every debt clears."""
+    """Step month by month with enough local precision for every valid input."""
+    with localcontext() as context:
+        context.prec = SIMULATION_PRECISION
+        return _simulate(debts, extra_payment, order_fn, minimum_rule, rollover)
+
+
+def _simulate(
+    debts: Sequence[Debt],
+    extra_payment: Decimal,
+    order_fn: OrderFn,
+    minimum_rule: MinimumRule,
+    rollover: bool = True,
+) -> Schedule:
+    """The month loop, entered only through the precision-scoped wrapper."""
     validate_portfolio(debts, extra_payment)
     extra_payment = to_cents(extra_payment)
 

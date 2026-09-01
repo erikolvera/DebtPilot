@@ -1,13 +1,22 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { DebtDraft } from "@/lib/api";
+import type { FinancialDebtDraft } from "@/lib/api";
 import { debtErrors, MAX_DEBTS } from "@/lib/validate";
 
 type Props = {
-  debts: DebtDraft[];
-  onChange: (debts: DebtDraft[]) => void;
+  debts: FinancialDebtDraft[];
+  onChange: (debts: FinancialDebtDraft[]) => void;
 };
+
+const DEBT_TYPES = [
+  ["credit_card", "Credit card"],
+  ["auto_loan", "Auto loan"],
+  ["personal_loan", "Personal loan"],
+  ["student_loan", "Student loan"],
+  ["medical_debt", "Medical debt"],
+  ["other", "Other debt"],
+] as const;
 
 // Tighter padding and smaller figures below `sm`. The fixed column widths that
 // stop "Visa Signature" truncating on desktop leave the numeric columns ~49-68px
@@ -19,7 +28,7 @@ const CELL = "w-full bg-transparent px-1 py-1.5 text-right tabular-nums " +
   "font-mono text-xs outline-none focus:bg-ink/5 rounded sm:px-2 sm:text-sm";
 
 export function DebtTable({ debts, onChange }: Props) {
-  const update = (id: string, field: keyof DebtDraft, value: string) =>
+  const update = (id: string, field: keyof FinancialDebtDraft, value: string) =>
     onChange(debts.map((debt) => (debt.id === id ? { ...debt, [field]: value } : debt)));
 
   const remove = (id: string) => onChange(debts.filter((debt) => debt.id !== id));
@@ -38,28 +47,31 @@ export function DebtTable({ debts, onChange }: Props) {
   const add = () => {
     const id = crypto.randomUUID();
     focusId.current = id;
-    onChange([...debts, { id, name: "", balance: "", apr: "", minimum_payment: "" }]);
+    onChange([...debts, { id, name: "", type: "credit_card", balance: "", apr: "", minimum_payment: "" }]);
   };
 
   // Messages live below the table, not in the cells: the numeric columns are
   // ~112px wide, so an in-cell message wrapped to three lines and doubled the
   // row's height, clipping the card name beside it. The inset marker on the
   // input says WHICH field; this list says what is wrong with it.
-  const problems = debts.flatMap((debt) => {
+  const problems = debts.flatMap((debt, index) => {
     const errors = debtErrors(debt);
-    const label = debt.name.trim() || "Untitled card";
-    return Object.values(errors).map((message) => `${label}: ${message}`);
+    const label = debt.name.trim() || "Untitled debt";
+    return Object.entries(errors).map(([field, message]) => ({
+      id: `debt-${index}-${field}-error`,
+      message: `${label}: ${message}`,
+    }));
   });
 
   return (
-    <section aria-labelledby="cards-heading">
-      <h2 id="cards-heading" className="eyebrow">
-        Your cards
+    <section aria-labelledby="debts-heading">
+      <h2 id="debts-heading" className="eyebrow">
+        Debts
       </h2>
 
       {debts.length === 0 ? (
         <p className="mt-4 text-sm text-ink-soft">
-          No cards yet. Add one to see your payoff date.
+          No debts added. Your report can still show monthly cash flow.
         </p>
       ) : (
         // table-fixed with explicit widths: auto layout gave every column an
@@ -82,11 +94,11 @@ export function DebtTable({ debts, onChange }: Props) {
         // squeezing five columns.
         <table className="mt-4 w-full table-fixed border-collapse">
           <caption className="sr-only">
-            Your credit cards. Edit any value to update the plan.
+            Your debts. Edit any value to update the report.
           </caption>
           <thead>
             <tr className="border-b border-rule text-left">
-              <th scope="col" className="eyebrow w-[38%] py-2 font-normal">Card</th>
+              <th scope="col" className="eyebrow w-[38%] py-2 font-normal">Debt</th>
               <th scope="col" className="eyebrow w-[22%] py-2 text-right font-normal">Owed</th>
               <th scope="col" className="eyebrow w-[16%] py-2 text-right font-normal">APR</th>
               <th scope="col" className="eyebrow w-[18%] py-2 text-right font-normal">Min</th>
@@ -94,9 +106,9 @@ export function DebtTable({ debts, onChange }: Props) {
             </tr>
           </thead>
           <tbody>
-            {debts.map((debt) => {
+            {debts.map((debt, index) => {
               const errors = debtErrors(debt);
-              const cardLabel = debt.name.trim() || "Untitled card";
+              const cardLabel = debt.name.trim() || "Untitled debt";
               return (
                 <tr key={debt.id} className="border-b border-rule/60">
                   <th scope="row" className="py-1 font-normal">
@@ -108,10 +120,21 @@ export function DebtTable({ debts, onChange }: Props) {
                       className="w-full rounded bg-transparent px-2 py-1.5 text-sm outline-none focus:bg-ink/5"
                       value={debt.name}
                       onChange={(event) => update(debt.id, "name", event.target.value)}
-                      aria-label="Card name"
+                      aria-label="Debt name"
                       aria-invalid={errors.name !== undefined}
-                      placeholder="Card name"
+                      aria-describedby={errors.name ? `debt-${index}-name-error` : undefined}
+                      placeholder="Debt name"
                     />
+                    <select
+                      className="mt-0.5 w-full rounded bg-transparent px-2 py-1 text-[0.6875rem] text-ink-soft outline-none focus:bg-ink/5"
+                      value={debt.type}
+                      onChange={(event) => update(debt.id, "type", event.target.value)}
+                      aria-label={`${cardLabel} — debt type`}
+                    >
+                      {DEBT_TYPES.map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
                   </th>
                   <td className="py-1">
                     <input
@@ -125,6 +148,7 @@ export function DebtTable({ debts, onChange }: Props) {
                       onChange={(event) => update(debt.id, "balance", event.target.value)}
                       aria-label={`${cardLabel} — balance owed`}
                       aria-invalid={errors.balance !== undefined}
+                      aria-describedby={errors.balance ? `debt-${index}-balance-error` : undefined}
                       placeholder="0.00"
                     />
                   </td>
@@ -137,6 +161,7 @@ export function DebtTable({ debts, onChange }: Props) {
                       onChange={(event) => update(debt.id, "apr", event.target.value)}
                       aria-label={`${cardLabel} — annual percentage rate`}
                       aria-invalid={errors.apr !== undefined}
+                      aria-describedby={errors.apr ? `debt-${index}-apr-error` : undefined}
                       placeholder="0.00"
                     />
                   </td>
@@ -149,6 +174,7 @@ export function DebtTable({ debts, onChange }: Props) {
                       onChange={(event) => update(debt.id, "minimum_payment", event.target.value)}
                       aria-label={`${cardLabel} — minimum payment`}
                       aria-invalid={errors.minimum_payment !== undefined}
+                      aria-describedby={errors.minimum_payment ? `debt-${index}-minimum_payment-error` : undefined}
                       placeholder="0.00"
                     />
                   </td>
@@ -157,7 +183,7 @@ export function DebtTable({ debts, onChange }: Props) {
                       type="button"
                       onClick={() => remove(debt.id)}
                       className="rounded px-2 py-1 text-ink-soft hover:text-ink"
-                      aria-label={`Remove ${debt.name || "this card"}`}
+                      aria-label={`Remove ${debt.name || "this debt"}`}
                     >
                       ×
                     </button>
@@ -172,7 +198,7 @@ export function DebtTable({ debts, onChange }: Props) {
       {problems.length > 0 && (
         <ul aria-live="polite" className="mt-3 space-y-1 text-xs text-ink-soft">
           {problems.map((problem) => (
-            <li key={problem}>{problem}</li>
+            <li id={problem.id} key={problem.id}>{problem.message}</li>
           ))}
         </ul>
       )}
@@ -183,10 +209,10 @@ export function DebtTable({ debts, onChange }: Props) {
         disabled={debts.length >= MAX_DEBTS}
         className="mt-4 rounded border border-rule px-3 py-1.5 text-sm hover:bg-ink/5 disabled:opacity-40"
       >
-        Add a card
+        Add debt
       </button>
       {debts.length >= MAX_DEBTS && (
-        <p className="mt-2 text-xs text-ink-soft">Twenty cards is the limit.</p>
+        <p className="mt-2 text-xs text-ink-soft">Twenty debts is the limit.</p>
       )}
     </section>
   );
