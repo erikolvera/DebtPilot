@@ -15,20 +15,35 @@ const USD_WHOLE = new Intl.NumberFormat("en-US", {
 });
 
 /**
- * Format an API money string.
+ * Format a decimal string exactly, without ever constructing a float.
  *
- * `Intl.NumberFormat.prototype.format` accepts a decimal string (ES2023) and
- * formats it exactly. Writing `format(Number(value))` instead would construct
- * the IEEE-754 double that the backend's `_reject_json_numbers` validator
+ * `Intl.NumberFormat.prototype.format` accepts a decimal string at runtime
+ * (ES2023) and formats it exactly. TypeScript, however, types the parameter as
+ * `StringNumericLiteral` — literally `` `${number}` | "Infinity" | ... `` — and a
+ * plain `string` is not assignable to that template-literal type. The cast is
+ * therefore unavoidable, and confining it to this one helper is the whole
+ * point: every money value in the app funnels through here, so there is exactly
+ * one place to audit.
+ *
+ * The alternative, `format(Number(value))`, type-checks without complaint and
+ * constructs the IEEE-754 double the backend's `_reject_json_numbers` validator
  * exists to keep out of this system — at the last possible moment, in the one
- * place nobody thinks to look.
+ * place nobody thinks to look. Do not "simplify" this helper into that.
+ *
+ * A non-numeric string renders as "$NaN" rather than throwing. That is a
+ * visible bug rather than a silently wrong figure, and every value reaching
+ * here originates as the engine's quantized Decimal output.
  */
+function formatDecimal(formatter: Intl.NumberFormat, value: string): string {
+  return formatter.format(value as `${number}`);
+}
+
 export function money(value: string): string {
-  return USD.format(value);
+  return formatDecimal(USD, value);
 }
 
 export function moneyWhole(value: string): string {
-  return USD_WHOLE.format(value);
+  return formatDecimal(USD_WHOLE, value);
 }
 
 const MONTHS = [
