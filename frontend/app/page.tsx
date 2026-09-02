@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CheckInStatusCard } from "@/components/CheckInStatusCard";
 
 const FEATURES = [
   ["Know the real number", "See what remains after living costs and every debt minimum.", "bg-[#fff5d6]"],
@@ -55,6 +56,10 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="mx-auto max-w-[1280px] px-5 pb-10 sm:px-8 lg:px-10">
+        <CheckInStatusCard />
       </section>
 
       <section className="mx-auto max-w-[1280px] px-5 pb-20 sm:px-8 lg:px-10">

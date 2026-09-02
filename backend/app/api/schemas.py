@@ -36,6 +36,19 @@ ExpenseCategory = Literal[
     "personal",
     "other",
 ]
+ProgressStatus = Literal[
+    "decreased",
+    "unchanged",
+    "increased",
+    "portfolio_changed",
+]
+ProgressMilestone = Literal[
+    "10_percent",
+    "25_percent",
+    "50_percent",
+    "75_percent",
+    "debt_free",
+]
 
 
 def _reject_json_numbers(value: Any) -> Any:
@@ -192,6 +205,40 @@ class FinancialReportDebtIn(DebtIn):
     type: DebtType = "credit_card"
 
 
+class CheckInDebtSnapshotIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=64)
+    balance: Money = Field(ge=0, le=MONEY_MAX)
+
+
+class CheckInSnapshotIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    month: str = Field(pattern=MONTH_PATTERN)
+    debts: list[CheckInDebtSnapshotIn] = Field(max_length=MAX_DEBTS_PER_USER)
+
+    @model_validator(mode="after")
+    def _unique_debt_ids(self) -> "CheckInSnapshotIn":
+        ids = [row.id for row in self.debts]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate check-in debt id")
+        return self
+
+
+class CheckInContextIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    baseline: CheckInSnapshotIn
+    previous: CheckInSnapshotIn
+
+    @model_validator(mode="after")
+    def _baseline_has_a_debt(self) -> "CheckInContextIn":
+        if not self.baseline.debts:
+            raise ValueError("check-in baseline must contain at least one debt")
+        return self
+
+
 class FinancialReportRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -202,6 +249,7 @@ class FinancialReportRequest(BaseModel):
         ge=0, le=MAX_REPORT_EXTRA_PAYMENT
     )
     start_month: str = Field(pattern=MONTH_PATTERN)
+    check_in_context: CheckInContextIn | None = None
 
     @model_validator(mode="after")
     def _unique_ids(self) -> "FinancialReportRequest":
@@ -213,6 +261,13 @@ class FinancialReportRequest(BaseModel):
             ids = [row.id for row in rows]
             if len(ids) != len(set(ids)):
                 raise ValueError(f"duplicate {label} id")
+        if self.check_in_context is not None:
+            baseline_month = self.check_in_context.baseline.month
+            previous_month = self.check_in_context.previous.month
+            if not baseline_month <= previous_month <= self.start_month:
+                raise ValueError(
+                    "check-in months must satisfy baseline <= previous <= start_month"
+                )
         return self
 
 
@@ -270,6 +325,19 @@ class PayoffGuidanceOut(BaseModel):
     payment_options: list[PayoffPaymentOptionOut]
 
 
+class ProgressComparisonOut(BaseModel):
+    status: ProgressStatus
+    amount: Money | None
+
+
+class CheckInProgressOut(BaseModel):
+    previous_month: str
+    since_previous: ProgressComparisonOut
+    since_baseline: ProgressComparisonOut
+    newly_paid_off_debt_ids: list[str]
+    milestones_reached: list[ProgressMilestone]
+
+
 class FinancialReportResponse(BaseModel):
     start_month: str
     total_debt: Money
@@ -277,5 +345,6 @@ class FinancialReportResponse(BaseModel):
     debt_payment_budget: DebtPaymentBudgetOut
     payoff_plan: PayoffPlanResponse | None
     payoff_guidance: PayoffGuidanceOut | None
+    check_in_progress: CheckInProgressOut | None
     recommendations: list[RecommendationOut]
     estimate_disclosure: str

@@ -82,6 +82,36 @@ export interface components {
              */
             status: "deficit" | "break_even" | "surplus";
         };
+        /** CheckInContextIn */
+        CheckInContextIn: {
+            baseline: components["schemas"]["CheckInSnapshotIn"];
+            previous: components["schemas"]["CheckInSnapshotIn"];
+        };
+        /** CheckInDebtSnapshotIn */
+        CheckInDebtSnapshotIn: {
+            /** Id */
+            id: string;
+            /** Balance */
+            balance: string;
+        };
+        /** CheckInProgressOut */
+        CheckInProgressOut: {
+            /** Previous Month */
+            previous_month: string;
+            since_previous: components["schemas"]["ProgressComparisonOut"];
+            since_baseline: components["schemas"]["ProgressComparisonOut"];
+            /** Newly Paid Off Debt Ids */
+            newly_paid_off_debt_ids: string[];
+            /** Milestones Reached */
+            milestones_reached: ("10_percent" | "25_percent" | "50_percent" | "75_percent" | "debt_free")[];
+        };
+        /** CheckInSnapshotIn */
+        CheckInSnapshotIn: {
+            /** Month */
+            month: string;
+            /** Debts */
+            debts: components["schemas"]["CheckInDebtSnapshotIn"][];
+        };
         /** CompactOptionImpactOut */
         CompactOptionImpactOut: {
             /**
@@ -202,6 +232,7 @@ export interface components {
             requested_extra_monthly_payment: string;
             /** Start Month */
             start_month: string;
+            check_in_context?: components["schemas"]["CheckInContextIn"] | null;
         };
         /** FinancialReportResponse */
         FinancialReportResponse: {
@@ -213,6 +244,7 @@ export interface components {
             debt_payment_budget: components["schemas"]["DebtPaymentBudgetOut"];
             payoff_plan: components["schemas"]["PayoffPlanResponse"] | null;
             payoff_guidance: components["schemas"]["PayoffGuidanceOut"] | null;
+            check_in_progress: components["schemas"]["CheckInProgressOut"] | null;
             /** Recommendations */
             recommendations: components["schemas"]["RecommendationOut"][];
             /** Estimate Disclosure */
@@ -288,6 +320,16 @@ export interface components {
             start_month: string;
             scenarios: components["schemas"]["ScenariosOut"];
             comparison: components["schemas"]["ComparisonOut"];
+        };
+        /** ProgressComparisonOut */
+        ProgressComparisonOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "decreased" | "unchanged" | "increased" | "portfolio_changed";
+            /** Amount */
+            amount: string | null;
         };
         /** RecommendationOut */
         RecommendationOut: {

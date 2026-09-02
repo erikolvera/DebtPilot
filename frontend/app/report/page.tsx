@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { CashFlowSummary } from "@/components/CashFlowSummary";
+import { CheckInStatusCard } from "@/components/CheckInStatusCard";
 import { EscapeChart, type Track } from "@/components/EscapeChart";
 import { PayoffGuidance } from "@/components/PayoffGuidance";
 import { Recommendations } from "@/components/Recommendations";
 import { ScenarioSummary } from "@/components/ScenarioSummary";
 import { delta, money } from "@/lib/format";
+import { isPositiveMoney } from "@/lib/checkIn";
 import { effectiveStrategy } from "@/lib/payoffGuidance";
 import { emptyReportCopy } from "@/lib/reportState";
 import { useFinancialProfile } from "@/lib/useFinancialProfile";
@@ -44,6 +46,9 @@ export default function ReportPage() {
         { key: "avalanche", label: "Avalanche", accent: "var(--avalanche)", scenario: plan.scenarios.avalanche },
       ]
     : [];
+  const debtNames = Object.fromEntries(
+    profile.debts.map((debt) => [debt.id, debt.name.trim() || "A tracked debt"]),
+  );
 
   if (!ready) {
     return <main className="mx-auto max-w-6xl px-5 py-16 text-ink-soft">Loading your report…</main>;
@@ -85,6 +90,12 @@ export default function ReportPage() {
         </section>
       ) : (
         <div className="mt-12 space-y-10">
+          <CheckInStatusCard
+            canStart={profile.debts.some((debt) => isPositiveMoney(debt.balance))}
+            showEnrollment
+            showLatest
+            debtNames={debtNames}
+          />
           <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
             <CashFlowSummary
               totalMonthlyIncome={report.cash_flow.total_monthly_income}

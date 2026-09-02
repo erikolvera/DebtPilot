@@ -71,6 +71,138 @@ def test_surplus_report_composes_cash_flow_and_payoff_plan(client):
         "compare_strategies",
         "assign_remaining_surplus",
     ]
+    assert body["check_in_progress"] is None
+
+
+def test_check_in_context_returns_decimal_string_progress(client):
+    response = client.post(
+        "/v1/financial-reports",
+        json=report_body(
+            debts=[
+                {
+                    "id": "card",
+                    "name": "Visa",
+                    "type": "credit_card",
+                    "balance": "1500.00",
+                    "apr": "20.00",
+                    "minimum_payment": "100.00",
+                }
+            ],
+            check_in_context={
+                "baseline": {
+                    "month": "2026-07",
+                    "debts": [{"id": "card", "balance": "2000.00"}],
+                },
+                "previous": {
+                    "month": "2026-08",
+                    "debts": [{"id": "card", "balance": "1750.00"}],
+                },
+            },
+        ),
+    )
+    assert response.status_code == 200
+    progress = response.json()["check_in_progress"]
+    assert progress == {
+        "previous_month": "2026-08",
+        "since_previous": {"status": "decreased", "amount": "250.00"},
+        "since_baseline": {"status": "decreased", "amount": "500.00"},
+        "newly_paid_off_debt_ids": [],
+        "milestones_reached": ["10_percent", "25_percent"],
+    }
+
+
+@pytest.mark.parametrize(
+    "context",
+    [
+        {
+            "baseline": {
+                "month": "2026-09",
+                "debts": [{"id": "card", "balance": "2000.00"}],
+            },
+            "previous": {
+                "month": "2026-08",
+                "debts": [{"id": "card", "balance": "1900.00"}],
+            },
+        },
+        {
+            "baseline": {
+                "month": "2026-07",
+                "debts": [{"id": "card", "balance": "2000.00"}],
+            },
+            "previous": {
+                "month": "2026-10",
+                "debts": [{"id": "card", "balance": "1900.00"}],
+            },
+        },
+    ],
+)
+def test_check_in_month_chronology_is_validated(client, context):
+    response = client.post(
+        "/v1/financial-reports",
+        json=report_body(check_in_context=context),
+    )
+    assert response.status_code == 422
+
+
+def test_check_in_snapshot_rejects_duplicate_ids_and_json_number_money(client):
+    context = {
+        "baseline": {
+            "month": "2026-07",
+            "debts": [
+                {"id": "card", "balance": "2000.00"},
+                {"id": "card", "balance": "100.00"},
+            ],
+        },
+        "previous": {
+            "month": "2026-08",
+            "debts": [{"id": "card", "balance": 1900}],
+        },
+    }
+    response = client.post(
+        "/v1/financial-reports",
+        json=report_body(check_in_context=context),
+    )
+    assert response.status_code == 422
+
+
+def test_check_in_snapshot_rejects_more_than_twenty_debts(client):
+    rows = [
+        {"id": f"debt-{index}", "balance": "100.00"}
+        for index in range(21)
+    ]
+    response = client.post(
+        "/v1/financial-reports",
+        json=report_body(
+            check_in_context={
+                "baseline": {"month": "2026-07", "debts": rows},
+                "previous": {"month": "2026-08", "debts": rows[:20]},
+            }
+        ),
+    )
+    assert response.status_code == 422
+
+
+def test_check_in_context_allows_an_empty_previous_portfolio(client):
+    response = client.post(
+        "/v1/financial-reports",
+        json=report_body(
+            debts=[],
+            check_in_context={
+                "baseline": {
+                    "month": "2026-07",
+                    "debts": [{"id": "card", "balance": "100.00"}],
+                },
+                "previous": {"month": "2026-08", "debts": []},
+            },
+        ),
+    )
+    assert response.status_code == 200
+    progress = response.json()["check_in_progress"]
+    assert progress["since_previous"] == {"status": "unchanged", "amount": "0.00"}
+    assert progress["since_baseline"] == {
+        "status": "portfolio_changed",
+        "amount": None,
+    }
 
 
 def test_unaffordable_extra_is_capped_before_simulation(client):

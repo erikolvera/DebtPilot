@@ -52,6 +52,31 @@ test("the financial report request keeps every money value as a string", () => {
   expect(wire.start_month).toBe("2026-09");
 });
 
+test("a check-in request includes only explicit Decimal-string snapshots", () => {
+  const request = buildFinancialReportRequest(
+    [],
+    [],
+    [
+      {
+        id: "card",
+        name: "Card",
+        type: "credit_card",
+        balance: "90.00",
+        apr: "10.00",
+        minimum_payment: "10.00",
+      },
+    ],
+    "0.00",
+    new Date(2026, 8, 1),
+    {
+      baseline: { month: "2026-07", debts: [{ id: "card", balance: "100.00" }] },
+      previous: { month: "2026-08", debts: [{ id: "card", balance: "95.00" }] },
+    },
+  );
+  expect(request.check_in_context?.previous.debts[0].balance).toBe("95.00");
+  expect(JSON.stringify(request)).not.toContain('"balance":95');
+});
+
 describe("apiBase", () => {
   test("normalizes a supplied origin", () => {
     expect(apiBase("https://api.example.com///")).toBe("https://api.example.com");

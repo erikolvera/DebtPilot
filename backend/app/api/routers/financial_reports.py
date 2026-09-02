@@ -15,6 +15,7 @@ from app.engine.money import to_cents
 
 from ..guidance import build_payoff_guidance
 from ..mappers import to_response
+from ..progress import build_check_in_progress
 from ..schemas import (
     CashFlowOut,
     DebtPaymentBudgetOut,
@@ -171,6 +172,10 @@ def create_financial_report(
         ),
         payoff_plan=payoff_plan,
         payoff_guidance=payoff_guidance,
+        check_in_progress=build_check_in_progress(
+            request.check_in_context,
+            debts,
+        ),
         recommendations=_recommendations(
             cash_flow.status,
             has_debts,

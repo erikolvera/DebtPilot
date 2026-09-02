@@ -9,6 +9,8 @@ export type FinancialReportRequest =
   NonNullable<ReportPost["requestBody"]>["content"]["application/json"];
 export type FinancialReportResponse =
   ReportPost["responses"][200]["content"]["application/json"];
+export type CheckInContext = NonNullable<FinancialReportRequest["check_in_context"]>;
+export type CheckInProgress = NonNullable<FinancialReportResponse["check_in_progress"]>;
 
 export type PayoffPlanResponse = NonNullable<FinancialReportResponse["payoff_plan"]>;
 export type ScenarioOut = PayoffPlanResponse["scenarios"]["snowball"];
@@ -101,8 +103,9 @@ export function buildFinancialReportRequest(
   debts: FinancialDebtDraft[],
   extra: string,
   now: Date = new Date(),
+  checkInContext?: CheckInContext,
 ): FinancialReportRequest {
-  return {
+  const request: FinancialReportRequest = {
     incomes: incomes.map((income) => ({
       ...income,
       name: income.name.trim(),
@@ -122,6 +125,8 @@ export function buildFinancialReportRequest(
     requested_extra_monthly_payment: extra,
     start_month: currentStartMonth(now),
   };
+  if (checkInContext !== undefined) request.check_in_context = checkInContext;
+  return request;
 }
 
 async function post<T>(path: string, body: unknown, signal: AbortSignal): Promise<T> {
