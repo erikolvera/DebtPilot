@@ -3,7 +3,7 @@
 [![Backend CI](https://github.com/erikolvera/DebtPilot/actions/workflows/backend.yml/badge.svg)](https://github.com/erikolvera/DebtPilot/actions/workflows/backend.yml)
 [![Frontend CI](https://github.com/erikolvera/DebtPilot/actions/workflows/frontend.yml/badge.svg)](https://github.com/erikolvera/DebtPilot/actions/workflows/frontend.yml)
 
-[Live app](https://debtpilot-lyart.vercel.app) · [API documentation](https://debtpilot-api.vercel.app/docs)
+[Live app](https://debtpilot-lyart.vercel.app) · [API documentation](https://debtpilot-api.vercel.app/docs) · [Roadmap](ROADMAP.md)
 
 DebtPilot turns a monthly household budget into a realistic debt-payoff plan.
 It calculates:
@@ -35,6 +35,26 @@ calculated without a generative model.
 - Estimated payoff dates, interest, total paid, and payoff chart.
 - Deterministic next-step recommendations.
 - Automatic browser-local saving; no account or external data connection.
+
+Optional email accounts for private backup and cross-device continuity are a
+conditional future direction, not a current feature. The [roadmap](ROADMAP.md)
+defines the demand, privacy, migration, and deletion guardrails that must be met
+before implementation begins.
+
+## Backup and recovery
+
+Use **Your data** to download an unencrypted JSON backup of your editable plan,
+strategy, and retained monthly check-ins. Backups include unsaved in-memory
+changes and are manual snapshots, not automatic synchronization. Keep these
+financial files private and download a fresh copy after changes.
+
+Restore validates a file locally, previews its contents, and asks before replacing
+both the plan and history. A failed restore preserves current data. Save failures
+show a warning with retry and backup actions. Unreadable saved data is preserved
+with automatic saving paused and a raw recovery download available.
+
+The browser stores the plan and history together; previous browser storage formats
+migrate automatically after a successful save. No accounts or database are needed.
 
 ## Architecture
 

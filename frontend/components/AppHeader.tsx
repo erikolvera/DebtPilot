@@ -8,6 +8,7 @@ const LINKS = [
   ["/plan/cash-flow", "Plan"],
   ["/report", "Report"],
   ["/check-in", "Check in"],
+  ["/data", "Your data"],
 ] as const;
 
 export function AppHeader() {
@@ -15,7 +16,7 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-rule bg-white/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-2 px-5 py-4 sm:gap-4 sm:px-8 lg:px-10">
+      <div className="mx-auto flex max-w-[1280px] flex-wrap items-center justify-between gap-2 px-5 py-4 sm:gap-4 sm:px-8 lg:px-10">
         <Link href="/" className="flex items-center gap-2 font-display text-lg font-bold">
           <span className="grid h-8 w-8 place-items-center rounded-xl bg-primary text-sm text-white shadow-md shadow-primary/20" aria-hidden="true">
             D

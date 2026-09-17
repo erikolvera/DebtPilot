@@ -154,7 +154,7 @@ function isCommitment(value: unknown): value is CheckInCommitment {
   );
 }
 
-function isState(value: unknown): value is CheckInState {
+export function isState(value: unknown): value is CheckInState {
   if (!isRecord(value)) return false;
   let baseline: CheckInPortfolioSnapshot | null = null;
   if (value.baseline !== null) {

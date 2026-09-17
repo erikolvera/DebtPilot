@@ -53,3 +53,7 @@ npm run dev
 Do not add accounts, database persistence, generative AI, or additional service
 layers unless the product requirements explicitly change. Prefer a small
 vertical feature over a large design document.
+
+`ROADMAP.md` records optional email accounts as a conditional future direction,
+not an approved implementation. Keep the current product anonymous and
+browser-local until that roadmap item is explicitly promoted.

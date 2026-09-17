@@ -1,43 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { ExpenseDraft, FinancialDebtDraft, IncomeDraft } from "./api";
-import {
-  browserStorage,
-  loadFinancialProfile,
-  saveFinancialProfile,
-  type FinancialProfile,
-  type PreferredStrategy,
-} from "./profileStorage";
-import { seedFinancialProfile } from "./seed";
+import type { PreferredStrategy, FinancialProfile } from "./profileStorage";
+import { useLocalData } from "@/components/LocalDataProvider";
 
 export function useFinancialProfile() {
-  const [profile, setProfile] = useState<FinancialProfile>(seedFinancialProfile);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setProfile(loadFinancialProfile(browserStorage(), seedFinancialProfile()));
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (ready) saveFinancialProfile(browserStorage(), profile);
-  }, [profile, ready]);
-
+  const { data, ready, update, retry } = useLocalData();
+  const patch = (values: Partial<FinancialProfile>) => update((current) => ({ ...current, profile: { ...current.profile, ...values } }));
   return {
-    profile,
+    profile: data.profile,
     ready,
-    setIncomes: (incomes: IncomeDraft[]) =>
-      setProfile((current) => ({ ...current, incomes })),
-    setExpenses: (expenses: ExpenseDraft[]) =>
-      setProfile((current) => ({ ...current, expenses })),
-    setDebts: (debts: FinancialDebtDraft[]) =>
-      setProfile((current) => ({ ...current, debts })),
-    setExtra: (extra: string) =>
-      setProfile((current) => ({ ...current, extra })),
-    setPreferredStrategy: (preferredStrategy: PreferredStrategy | null) =>
-      setProfile((current) => ({ ...current, preferredStrategy })),
-    saveNow: () => saveFinancialProfile(browserStorage(), profile),
+    setIncomes: (incomes: IncomeDraft[]) => patch({ incomes }),
+    setExpenses: (expenses: ExpenseDraft[]) => patch({ expenses }),
+    setDebts: (debts: FinancialDebtDraft[]) => patch({ debts }),
+    setExtra: (extra: string) => patch({ extra }),
+    setPreferredStrategy: (preferredStrategy: PreferredStrategy | null) => patch({ preferredStrategy }),
+    saveNow: retry,
   };
 }

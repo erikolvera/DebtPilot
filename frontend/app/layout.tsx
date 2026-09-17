@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Bricolage_Grotesque, IBM_Plex_Mono, Instrument_Sans } from "next/font/google";
 import { AppHeader } from "@/components/AppHeader";
 import "./globals.css";
+import { LocalDataProvider } from "@/components/LocalDataProvider";
 
 // Variable font: omit `weight`, and list extra axes. `wght` is implicit and
 // must not appear in `axes` — next/font throws if it does.
@@ -37,7 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${bricolage.variable} ${instrument.variable} ${plexMono.variable}`}>
       <body>
         <AppHeader />
-        {children}
+        <LocalDataProvider>{children}</LocalDataProvider>
         <footer className="mx-auto flex max-w-[1280px] flex-col justify-between gap-3 border-t border-rule px-5 py-8 text-sm text-ink-soft sm:flex-row sm:px-8 lg:px-10">
           <p>DebtPilot · deterministic planning, private by default.</p>
           <p>Estimates only — not financial advice.</p>

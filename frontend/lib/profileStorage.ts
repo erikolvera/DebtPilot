@@ -99,7 +99,7 @@ function isV3Profile(value: unknown): value is V3FinancialProfile {
   );
 }
 
-function isProfile(value: unknown): value is FinancialProfile {
+export function isProfile(value: unknown): value is FinancialProfile {
   if (!isV3Profile(value)) return false;
   const preferredStrategy = (value as Record<string, unknown>).preferredStrategy;
   return (

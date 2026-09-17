@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useLocalData } from "./LocalDataProvider";
 import { currentStartMonth } from "@/lib/api";
 import {
   commitmentSentence,
@@ -9,14 +9,9 @@ import {
   progressCopy,
 } from "@/lib/checkIn";
 import {
-  browserCheckInStorage,
   checkInDue,
   dismissCheckInPrompt,
-  emptyCheckInState,
   latestCheckIn,
-  loadCheckInState,
-  saveCheckInState,
-  type CheckInState,
 } from "@/lib/checkInStorage";
 import { calendarMonth } from "@/lib/format";
 
@@ -33,15 +28,9 @@ export function CheckInStatusCard({
   showLatest = false,
   debtNames = {},
 }: Props) {
-  const [state, setState] = useState<CheckInState>(emptyCheckInState());
-  const [ready, setReady] = useState(false);
+  const { data, ready, update } = useLocalData();
+  const state = data.checkIns;
   const month = currentStartMonth();
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState(loadCheckInState(browserCheckInStorage()));
-    setReady(true);
-  }, []);
 
   if (!ready) return null;
   const latest = latestCheckIn(state);
@@ -85,8 +74,7 @@ export function CheckInStatusCard({
             type="button"
             className="secondary-button px-5"
             onClick={() => {
-              saveCheckInState(browserCheckInStorage(), dismissed);
-              setState(dismissed);
+              update((current) => ({ ...current, checkIns: dismissed }));
             }}
           >
             Not now

@@ -19,20 +19,16 @@ import {
   type CheckInCommitment,
 } from "@/lib/checkIn";
 import {
-  browserCheckInStorage,
-  clearCheckInState,
   emptyCheckInState,
   latestCheckIn,
-  loadCheckInState,
   progressContextFor,
   recordCheckIn,
-  saveCheckInState,
   type CheckInSnapshot,
-  type CheckInState,
 } from "@/lib/checkInStorage";
 import { calendarMonth, money } from "@/lib/format";
 import { effectiveStrategy } from "@/lib/payoffGuidance";
 import { describeReportError } from "@/lib/reportState";
+import { useLocalData } from "@/components/LocalDataProvider";
 import { useFinancialProfile } from "@/lib/useFinancialProfile";
 import { debtErrors, isFinancialReportSendable } from "@/lib/validate";
 
@@ -87,8 +83,9 @@ function selectedPayoffMonth(
 }
 
 export default function CheckInPage() {
-  const { profile, ready, setDebts } = useFinancialProfile();
-  const [history, setHistory] = useState<CheckInState>(emptyCheckInState());
+  const { profile, ready } = useFinancialProfile();
+  const { data, update } = useLocalData();
+  const history = data.checkIns;
   const [draftDebts, setDraftDebts] = useState<FinancialDebtDraft[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [feeling, setFeeling] = useState<Feeling | null>(null);
@@ -108,7 +105,6 @@ export default function CheckInPage() {
     if (!ready) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftDebts(profile.debts.map((debt) => ({ ...debt })));
-    setHistory(loadCheckInState(browserCheckInStorage()));
     setLoaded(true);
   }, [profile.debts, ready]);
 
@@ -227,9 +223,7 @@ export default function CheckInPage() {
       pendingSnapshot,
       skipCommitment ? null : selectedCommitment,
     );
-    const persisted = saveCheckInState(browserCheckInStorage(), next);
-    setHistory(next);
-    setDebts(draftDebts);
+    const persisted = update((current) => ({ ...current, profile: { ...current.profile, debts: draftDebts }, checkIns: next }));
     setSaved(true);
     setStorageWarning(
       persisted
@@ -443,7 +437,7 @@ export default function CheckInPage() {
                 disabled={saved || (!skipCommitment && selectedCommitment === null)}
                 className="primary-button mt-6 px-6 disabled:pointer-events-none disabled:opacity-50"
               >
-                {saved ? "Check-in saved" : "Save this check-in"}
+                {saved ? "Check-in recorded" : "Save this check-in"}
               </button>
               {storageWarning !== null && <p role="status" className="mt-3 text-sm text-danger">{storageWarning}</p>}
               {saved && storageWarning === null && (
@@ -475,9 +469,8 @@ export default function CheckInPage() {
                     type="button"
                     className="rounded-full bg-danger px-3 py-1.5 text-sm font-semibold text-white"
                     onClick={() => {
-                      const cleared = clearCheckInState(browserCheckInStorage());
+                      const cleared = update((current) => ({ ...current, checkIns: emptyCheckInState() }), true);
                       if (cleared) {
-                        setHistory(emptyCheckInState());
                         setReport(null);
                         setSaved(false);
                         setStorageWarning(null);
