@@ -7,10 +7,9 @@ user's browser.
 
 ## Current milestone: local data protection
 
-Backup and restore preserves the anonymous browser-local experience. Users can
-export a versioned JSON snapshot, preview and confirm replacement of the complete
-plan and check-in history, and recover from visible storage failures. Files stay
-on the user's device; this is manual backup, not cloud synchronization.
+The plan and check-in history are saved together in the browser. Save failures
+remain visible with a retry action. Manual JSON backup and restore have been
+removed ahead of account storage work.
 
 Validate repeat-user demand for automatic recovery and cross-device continuity
 before promoting optional accounts below.
@@ -78,4 +77,3 @@ When delivered:
   export is available before deletion.
 - Existing calculation behavior, deterministic recommendations, and financial
   invariants remain unchanged.
-

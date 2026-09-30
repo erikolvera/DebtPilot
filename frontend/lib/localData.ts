@@ -3,7 +3,6 @@ import { CHECK_IN_KEY, emptyCheckInState, isState, type CheckInState } from "./c
 import { seedFinancialProfile } from "./seed";
 
 export const DATA_KEY = "debtpilot.data.v1";
-export const MAX_BACKUP_BYTES = 5 * 1024 * 1024;
 const PROFILE_KEYS = ["debtpilot.financial-profile.v4", "debtpilot.financial-profile.v3", "debtpilot.financial-profile.v2", "debtpilot.portfolio.v1"];
 const LEGACY_KEYS = [...PROFILE_KEYS, CHECK_IN_KEY];
 export type LocalData = { version: 1; profile: FinancialProfile; checkIns: CheckInState };
@@ -28,18 +27,17 @@ export function writeLocalData(storage: DataStorage | null, data: LocalData): bo
   return true;
 }
 export function readLocalData(storage: DataStorage | null): {
-  data: LocalData; error: string | null; recovery: Record<string, string> | null;
+  data: LocalData; error: string | null; blocked: boolean;
 } {
   const data = initialData();
   const raw: Record<string, string> = {};
-  if (!storage) return { data, error: "Browser storage is unavailable. Changes are only available during this visit.", recovery: null };
+  if (!storage) return { data, error: "Browser storage is unavailable. Changes are only available during this visit.", blocked: false };
   try {
     const current = storage.getItem(DATA_KEY);
     if (current !== null) {
-      raw[DATA_KEY] = current;
       const parsed: unknown = JSON.parse(current);
       if (!isLocalData(parsed)) throw new Error("Invalid saved data");
-      return { data: parsed, error: null, recovery: null };
+      return { data: parsed, error: null, blocked: false };
     }
     for (const key of LEGACY_KEYS) {
       const value = storage.getItem(key);
@@ -58,32 +56,8 @@ export function readLocalData(storage: DataStorage | null): {
       data.checkIns = checkIns;
     }
     const saved = writeLocalData(storage, data);
-    return { data, error: saved ? null : "This browser could not save your data. Download a backup before leaving.", recovery: null };
+    return { data, error: saved ? null : "This browser could not save your data. Changes are only available during this visit.", blocked: false };
   } catch {
-    return { data, error: "Saved data could not be read. Automatic saving is paused to protect the original data. Download the recovery file, or restore a valid backup.", recovery: raw };
+    return { data, error: "Saved data could not be read. Automatic saving is paused to protect the original data.", blocked: true };
   }
-}
-export function createBackup(data: LocalData, date = new Date()): string {
-  return JSON.stringify({ format: "debtpilot-backup", version: 1, exportedAt: date.toISOString(), profile: data.profile, checkIns: data.checkIns }, null, 2);
-}
-export function parseBackup(text: string): LocalData {
-  if (new TextEncoder().encode(text).byteLength > MAX_BACKUP_BYTES) throw new Error("Choose a backup smaller than 5 MiB.");
-  let value: unknown;
-  try { value = JSON.parse(text); } catch { throw new Error("This file is not valid JSON."); }
-  if (typeof value !== "object" || value === null) throw new Error("This is not a DebtPilot backup.");
-  const record = value as Record<string, unknown>;
-  if (record.format !== "debtpilot-backup") throw new Error("This is not a DebtPilot backup.");
-  if (record.version !== 1) throw new Error("This backup version is not supported.");
-  if (typeof record.exportedAt !== "string" || !Number.isFinite(Date.parse(record.exportedAt)) || !isLocalData(record)) throw new Error("This backup contains invalid plan or check-in data.");
-  return { version: 1, profile: record.profile, checkIns: record.checkIns };
-}
-export function downloadJson(text: string, filename: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

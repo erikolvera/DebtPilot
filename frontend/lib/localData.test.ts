@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { CHECK_IN_KEY, emptyCheckInState, recordCheckIn } from "./checkInStorage";
-import { createBackup, DATA_KEY, parseBackup, readLocalData, writeLocalData, type LocalData } from "./localData";
+import { DATA_KEY, readLocalData, writeLocalData, type LocalData } from "./localData";
 
 const PROFILE_KEY = "debtpilot.financial-profile.v4";
 
@@ -39,51 +39,6 @@ function stub(entries: Record<string, string> = {}) {
     removeItem: vi.fn((key: string) => { store.delete(key); }),
   };
 }
-
-describe("portable backups", () => {
-  test("round-trips exact decimal strings, debt IDs, strategy, and full history", () => {
-    const data = fixture();
-    const backup = createBackup(data, new Date("2026-09-17T12:00:00.000Z"));
-    expect(JSON.parse(backup)).toMatchObject({ format: "debtpilot-backup", version: 1, exportedAt: "2026-09-17T12:00:00.000Z" });
-    expect(parseBackup(backup)).toEqual(data);
-  });
-
-  test("preserves incomplete editable drafts without requiring a report", () => {
-    const data = fixture();
-    data.profile.debts[0].balance = "";
-    data.profile.incomes[0].amount = "unfinished";
-    data.profile.extra = "";
-    expect(parseBackup(createBackup(data))).toEqual(data);
-  });
-
-  test.each(["not JSON", "null", "[]", "{}"])("rejects malformed backup %s", (text) => {
-    expect(() => parseBackup(text)).toThrow();
-  });
-
-  test("rejects unknown formats and versions", () => {
-    const backup = JSON.parse(createBackup(fixture()));
-    expect(() => parseBackup(JSON.stringify({ ...backup, format: "other" }))).toThrow();
-    expect(() => parseBackup(JSON.stringify({ ...backup, version: 2 }))).toThrow();
-  });
-
-  test("rejects files over 5 MiB, counting UTF-8 bytes", () => {
-    const data = fixture();
-    data.profile.incomes[0].name = "é".repeat(3 * 1024 * 1024);
-    expect(() => parseBackup(createBackup(data))).toThrow();
-  });
-
-  test("rejects invalid money types and collection-limit violations", () => {
-    const backup = JSON.parse(createBackup(fixture()));
-    backup.profile.debts[0].balance = 1000.01;
-    expect(() => parseBackup(JSON.stringify(backup))).toThrow();
-    const data = fixture();
-    data.profile.debts = Array.from({ length: 21 }, (_, index) => ({ ...data.profile.debts[0], id: String(index) }));
-    expect(() => parseBackup(createBackup(data))).toThrow();
-    const history = fixture();
-    history.checkIns.snapshots = Array.from({ length: 25 }, () => history.checkIns.snapshots[0]);
-    expect(() => parseBackup(createBackup(history))).toThrow();
-  });
-});
 
 describe("combined local storage", () => {
   test("saves profile and history with a single atomic key write", () => {
@@ -144,7 +99,7 @@ describe("combined local storage", () => {
     const storage = stub({ [DATA_KEY]: "broken", [PROFILE_KEY]: JSON.stringify(fixture().profile) });
     const result = readLocalData(storage);
     expect(result.error).toBeTruthy();
-    expect(result.recovery?.[DATA_KEY]).toBe("broken");
+    expect(result.blocked).toBe(true);
     expect(storage.setItem).not.toHaveBeenCalled();
     expect(storage.removeItem).not.toHaveBeenCalled();
     expect(storage.store.get(DATA_KEY)).toBe("broken");
@@ -154,7 +109,7 @@ describe("combined local storage", () => {
     const storage = stub({ [PROFILE_KEY]: JSON.stringify(fixture().profile), [CHECK_IN_KEY]: "broken" });
     const result = readLocalData(storage);
     expect(result.error).toBeTruthy();
-    expect(result.recovery?.[CHECK_IN_KEY]).toBe("broken");
+    expect(result.blocked).toBe(true);
     expect(storage.setItem).not.toHaveBeenCalled();
     expect(storage.removeItem).not.toHaveBeenCalled();
   });
