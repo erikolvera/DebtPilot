@@ -77,7 +77,9 @@ Use this workflow for every feature implementation or removal:
    Merge once required CI checks pass, review findings are resolved, and branch
    protection permits it. Never bypass required reviews or failing checks.
 
-Carry the feature through these six steps when the task authorizes delivery.
+A request to implement or remove a feature includes these six delivery steps
+unless the user explicitly limits the scope, such as local-only work or a draft
+PR.
 If access, required review, CI, or another external gate blocks completion,
 report the exact blocker and link the PR. Report the final PR and merge status;
 merging code does not authorize production deployment or enabling feature flags.
