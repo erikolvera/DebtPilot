@@ -12,7 +12,7 @@ type Mode = "login" | "signup" | "forgot";
 export default function AccountPage() {
   const router = useRouter();
   const { accountId, status, signOut, download } = useLocalData();
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<Mode>("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState("");
@@ -21,7 +21,6 @@ export default function AccountPage() {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleteWorking, setDeleteWorking] = useState(false);
-  if (!accountsEnabled) return <main className="mx-auto max-w-2xl px-5 py-16"><h1 className="font-display text-3xl">Accounts are not available yet</h1><Link href="/plan/cash-flow" className="underline">Continue planning as a guest</Link></main>;
   const client = browserClient();
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -60,11 +59,16 @@ export default function AccountPage() {
     finally { setDeleteWorking(false); setDeletePassword(""); }
   }
   return <main className="mx-auto max-w-2xl space-y-8 px-5 py-12">
-    <div><p className="eyebrow text-primary">Optional cloud saving</p><h1 className="mt-2 font-display text-4xl font-semibold">Your account</h1><p className="mt-3 text-ink-soft">Keep planning as a guest, or save one personal plan across devices. Email is used for sign-in and recovery.</p><Link href="/privacy" className="mt-3 inline-block text-sm underline">How your financial data is stored</Link></div>
+    <div><p className="eyebrow text-primary">Optional cloud saving</p><h1 className="mt-2 font-display text-4xl font-semibold">{accountId ? "Your account" : "Sign up or log in"}</h1><p className="mt-3 text-ink-soft">Keep planning as a guest, or save one personal plan across devices. Email is used for sign-in and recovery.</p><Link href="/privacy" className="mt-3 inline-block text-sm underline">How your financial data is stored</Link></div>
+    {!accountsEnabled && <aside role="status" className="rounded-xl border border-rule bg-paper p-4">
+      <p className="font-semibold">Account saving is not available yet</p>
+      <p className="mt-2 text-sm text-ink-soft">You can keep planning in this browser. Sign-up and log-in will be available when cloud saving is ready.</p>
+      <Link href="/report" className="mt-3 inline-block font-semibold underline">Return to your report</Link>
+    </aside>}
     {notice && <p role="status" className="rounded-xl bg-paper p-4">{notice}</p>}
     {accountId ? <>
       <section className="panel space-y-4"><h2 className="font-display text-2xl">Your saved plan</h2><p>Sync status: {status}</p><button className="secondary-button px-4" onClick={download}>Download JSON backup</button><button className="secondary-button ml-2 px-4" onClick={() => { void signOut(); }}>Sign out</button></section>
       <section className="panel space-y-4"><h2 className="font-display text-2xl">Delete account</h2><p>Deletion removes your sign-in and cloud plan. Download a backup first if you want to keep your data.</p><label className="block">Confirm your password<input className="mt-2 block w-full rounded-xl border p-3" type="password" autoComplete="current-password" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} /></label><label className="flex gap-2"><input type="checkbox" checked={deleteConfirm} onChange={(event) => setDeleteConfirm(event.target.checked)} />I understand this deletes my account and cloud plan.</label><button className="secondary-button px-4" disabled={!deleteConfirm || !deletePassword || deleteWorking} onClick={() => { void deleteAccount(); }}>Delete my account</button></section>
-    </> : <section className="panel space-y-4"><div className="flex gap-4"><button className="font-semibold underline" onClick={() => { setMode("login"); setNotice(""); }}>Log in</button><button className="font-semibold underline" onClick={() => { setMode("signup"); setNotice(""); }}>Sign up</button><button className="font-semibold underline" onClick={() => { setMode("forgot"); setNotice(""); }}>Reset password</button></div><h2 className="font-display text-2xl">{mode === "signup" ? "Create an account" : mode === "forgot" ? "Reset your password" : "Welcome back"}</h2><form className="space-y-4" onSubmit={(event) => { void submit(event); }}><label className="block">Email<input required className="mt-2 block w-full rounded-xl border p-3" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>{mode !== "forgot" && <label className="block">Password<input required className="mt-2 block w-full rounded-xl border p-3" type="password" minLength={mode === "signup" ? 12 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} /></label>}<button disabled={working} className="primary-button px-5">{mode === "signup" ? "Sign up" : mode === "forgot" ? "Send reset link" : "Log in"}</button></form>{verify && <button className="secondary-button px-4" onClick={() => { void resend(); }}>Resend verification email</button>}</section>}
+    </> : <section className="panel space-y-4"><div className="flex gap-4"><button className="font-semibold underline" aria-pressed={mode === "login"} onClick={() => { setMode("login"); setNotice(""); }}>Log in</button><button className="font-semibold underline" aria-pressed={mode === "signup"} onClick={() => { setMode("signup"); setNotice(""); }}>Sign up</button><button className="font-semibold underline" aria-pressed={mode === "forgot"} onClick={() => { setMode("forgot"); setNotice(""); }}>Reset password</button></div><h2 className="font-display text-2xl">{mode === "signup" ? "Create an account" : mode === "forgot" ? "Reset your password" : "Welcome back"}</h2><form onSubmit={(event) => { void submit(event); }}><fieldset className="space-y-4 disabled:opacity-60" disabled={!accountsEnabled || working}><legend className="sr-only">{mode === "signup" ? "Create an account" : mode === "forgot" ? "Reset your password" : "Log in"}</legend><label className="block">Email<input required className="mt-2 block w-full rounded-xl border p-3" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>{mode !== "forgot" && <label className="block">Password<input required className="mt-2 block w-full rounded-xl border p-3" type="password" minLength={mode === "signup" ? 12 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} /></label>}<button disabled={working} className="primary-button px-5">{mode === "signup" ? "Sign up" : mode === "forgot" ? "Send reset link" : "Log in"}</button></fieldset></form>{verify && <button className="secondary-button px-4" onClick={() => { void resend(); }}>Resend verification email</button>}</section>}
   </main>;
 }
