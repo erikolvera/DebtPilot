@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { useLocalData } from "@/components/LocalDataProvider";
+import { accountsEnabled } from "@/lib/cloud/config";
 import { CashFlowSummary } from "@/components/CashFlowSummary";
 import { CheckInStatusCard } from "@/components/CheckInStatusCard";
 import { EscapeChart, type Track } from "@/components/EscapeChart";
@@ -16,6 +18,7 @@ import { useFinancialProfile } from "@/lib/useFinancialProfile";
 import { useReport } from "@/lib/useReport";
 
 export default function ReportPage() {
+  const { accountId } = useLocalData();
   const { profile, ready, setExtra, setPreferredStrategy } = useFinancialProfile();
   const { report, pending, stale, error } = useReport(
     profile.incomes,
@@ -66,13 +69,20 @@ export default function ReportPage() {
             Here is what your numbers can do.
           </h1>
         </div>
-        <Link
-          href="/plan/cash-flow"
-          className="secondary-button shrink-0"
-        >
-          Edit my plan
-        </Link>
+        <div className="flex shrink-0 flex-wrap gap-3">
+          <Link href="/account" className="primary-button">
+            {accountId ? "Manage saved plan" : "Save plan"}
+          </Link>
+          <Link href="/plan/cash-flow" className="secondary-button">
+            Edit my plan
+          </Link>
+        </div>
       </header>
+      {!accountId && <p className="mt-4 text-sm text-ink-soft">
+        {accountsEnabled
+          ? "Sign up or log in to save your plan across devices. Your browser plan stays here while you sign in."
+          : "Account saving is not available yet. You can keep planning in this browser."}
+      </p>}
 
       {error !== null && !pending && (
         <p role="status" className="mt-8 border-l-2 border-snowball pl-3 text-sm">

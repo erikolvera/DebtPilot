@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { accountsEnabled } from "@/lib/cloud/config";
 
 const LINKS = [
   ["/", "Overview"],
@@ -26,7 +25,6 @@ export function AppHeader() {
         </Link>
         <nav aria-label="Primary navigation" className="flex items-center gap-0.5 text-xs sm:gap-1 sm:text-sm">
           {LINKS.map(([href, label]) => {
-            if (href === "/account" && !accountsEnabled) return null;
             const section = href.split("/")[1];
             const active = href === "/" ? pathname === "/" : pathname.startsWith(`/${section}`);
             return (
