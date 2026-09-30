@@ -60,11 +60,25 @@ export function LocalDataProvider({ children }: { children: React.ReactNode }) {
     return id ? writePending(id, { data: current.current, revision: revision.current, dirty: dirty.current, mutationId, acknowledged }) : true;
   }, []);
 
+  const lockAccount = useCallback(() => {
+      generation.current++; identity.current = null; setAccountId(null);
+      if (timer.current) clearTimeout(timer.current);
+      paused.current = true; blocked.current = true; dirty.current = false;
+      setCurrent(initialData()); setChoice(null); setSavingBlocked(true);
+      setUnavailable(true); setReady(true); setStatus("unsynced");
+      setError("Your account session expired. Sign in again to unlock your saved plan.");
+  }, [setCurrent]);
+
   const flush = useCallback(async (): Promise<SaveResult> => {
     const id = identity.current;
     const invocation = generation.current;
     if (!id && blocked.current) return { ok: false, reason: "storage" };
-    if (!id) return writeLocalData(storage(), current.current) ? { ok: true } : { ok: false, reason: "storage" };
+    if (!id) {
+      const saved = writeLocalData(storage(), current.current);
+      setStatus(saved ? "saved" : "unsynced");
+      setError(saved ? null : "This browser could not save your data. Changes remain available during this visit.");
+      return saved ? { ok: true } : { ok: false, reason: "storage" };
+    }
     if (paused.current) return { ok: false, reason: "conflict" };
     if (pending.current) {
       const prior = await pending.current;
@@ -77,6 +91,7 @@ export function LocalDataProvider({ children }: { children: React.ReactNode }) {
     if (uncertain?.mutationId) {
       const observed = await loadPlan();
       if (identity.current !== id || generation.current !== invocation) return { ok: false, reason: "auth" };
+      if (observed.error === "auth") lockAccount();
       if (observed.error) return { ok: false, reason: observed.error };
       if (observed.plan?.lastMutationId === uncertain.mutationId) {
         revision.current = observed.plan.revision;
@@ -104,8 +119,9 @@ export function LocalDataProvider({ children }: { children: React.ReactNode }) {
         setChoice({ browser: current.current, cloud: observed.plan, fromCache: true });
         return { ok: false, reason: "conflict" };
       }
+      if (result.error === "auth") { lockAccount(); return { ok: false, reason: "auth" }; }
       if (result.error || !result.plan) {
-        setStatus("unsynced"); setError(result.error === "auth" ? "Sign in again to save your changes." : result.error === "too_large" ? "This plan exceeds the 1 MiB cloud limit. Download a backup and reduce the plan before retrying." : "Cloud saving failed. Retry or download a backup.");
+        setStatus("unsynced"); setError(result.error === "too_large" ? "This plan exceeds the 1 MiB cloud limit. Download a backup and reduce the plan before retrying." : "Cloud saving failed. Retry or download a backup.");
         return { ok: false, reason: result.error ?? "network" };
       }
       revision.current = result.plan.revision;
@@ -119,7 +135,7 @@ export function LocalDataProvider({ children }: { children: React.ReactNode }) {
     const result = await promise;
     pending.current = null;
     return result;
-  }, [cache]);
+  }, [cache, lockAccount]);
 
   const update = useCallback((change: (data: LocalData) => LocalData) => {
     if (paused.current) return;
@@ -172,6 +188,7 @@ export function LocalDataProvider({ children }: { children: React.ReactNode }) {
       setStatus("conflict"); setError("Your cloud plan changed. Choose which version to keep.");
       return { ok: false, reason: "conflict" };
     }
+    if (result.error === "auth") { lockAccount(); return { ok: false, reason: "auth" }; }
     if (result.error || !result.plan) {
       if (queueOnFailure && result.error === "network") update(() => next);
       setStatus("unsynced"); setError(result.error === "too_large" ? "This plan exceeds the 1 MiB cloud limit. Download a backup and reduce the plan." : "This action could not be saved. Retry when connected.");
@@ -184,7 +201,7 @@ export function LocalDataProvider({ children }: { children: React.ReactNode }) {
     setStatus(dirty.current ? "unsynced" : "saved"); setError(null);
     if (dirty.current) timer.current = setTimeout(() => { void flush(); }, 750);
     return { ok: true };
-  }, [cache, flush, setCurrent, update]);
+  }, [cache, flush, lockAccount, setCurrent, update]);
 
   const choose = useCallback(async (selection: "browser" | "cloud" | "empty"): Promise<SaveResult> => {
     if (!choice || !identity.current) return { ok: false, reason: "auth" };
@@ -211,10 +228,14 @@ export function LocalDataProvider({ children }: { children: React.ReactNode }) {
     const id = identity.current;
     intentionalSignOut.current = true;
     const result = await browserClient()?.auth.signOut({ scope: "local" });
+    if (result?.error) setError("Sign-out failed. Try again when connected.");
     if (!result?.error && id) {
       try { storage()?.removeItem(accountKey(id)); } catch { /* best effort */ }
       try { storage()?.removeItem(lastAccountKey); } catch { /* best effort */ }
-      if (typeof BroadcastChannel !== "undefined") new BroadcastChannel("debtpilot-accounts").postMessage({ type: "signout", id });
+      if (typeof BroadcastChannel !== "undefined") {
+        const channel = new BroadcastChannel("debtpilot-accounts");
+        channel.postMessage({ type: "signout", id }); channel.close();
+      }
     }
     intentionalSignOut.current = false;
   }, []);
@@ -230,14 +251,7 @@ export function LocalDataProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
     const auth = browserClient();
     if (!auth) { setError("Account storage is not configured. Your browser data remains available."); setReady(true); return; }
-    const lock = () => {
-      generation.current++; identity.current = null; setAccountId(null);
-      if (timer.current) clearTimeout(timer.current);
-      paused.current = true; blocked.current = true; dirty.current = false;
-      setCurrent(initialData()); setChoice(null); setSavingBlocked(true);
-      setUnavailable(true); setReady(true); setStatus("unsynced");
-      setError("Your account session expired. Sign in again to unlock your saved plan.");
-    };
+    const lock = lockAccount;
     const initialize = async (id: string | null) => {
       if (!mounted) return;
       const initialization = ++generation.current;
@@ -256,6 +270,7 @@ export function LocalDataProvider({ children }: { children: React.ReactNode }) {
       const cached = readPending(id);
       const cloud = await loadPlan();
       if (!mounted || identity.current !== id || generation.current !== initialization) return;
+      if (cloud.error === "auth") { lock(); return; }
       if (cloud.error) {
         loadFailed.current = true;
         if (cached) { revision.current = cached.revision; dirty.current = cached.dirty; setCurrent(cached.data); }
@@ -321,7 +336,7 @@ export function LocalDataProvider({ children }: { children: React.ReactNode }) {
     };
     window.addEventListener("focus", focus);
     return () => { mounted = false; listener.data.subscription.unsubscribe(); channel?.close(); window.removeEventListener("online", online); window.removeEventListener("focus", focus); if (timer.current) clearTimeout(timer.current); };
-  }, [flush, setCurrent]);
+  }, [flush, lockAccount, setCurrent]);
 
   const download = () => downloadJson(createBackup(choice?.browser ?? current.current), `debtpilot-backup-${new Date().toISOString().slice(0, 10)}.json`);
   const retry = async (): Promise<SaveResult> => {
