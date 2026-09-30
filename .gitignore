@@ -32,6 +32,8 @@ dist/
 .claude/
 .superpowers/
 backend/supabase/
+supabase/.temp/
+supabase/.branches/
 
 # Next.js frontend
 frontend/.next/

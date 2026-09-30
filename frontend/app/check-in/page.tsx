@@ -84,7 +84,7 @@ function selectedPayoffMonth(
 
 export default function CheckInPage() {
   const { profile, ready } = useFinancialProfile();
-  const { data, update } = useLocalData();
+  const { data, commit, accountId } = useLocalData();
   const history = data.checkIns;
   const [draftDebts, setDraftDebts] = useState<FinancialDebtDraft[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -216,19 +216,19 @@ export default function CheckInPage() {
     previewSnapshot = latestCheckIn(recordCheckIn(history, pendingSnapshot, null));
   }
 
-  const finish = () => {
+  const finish = async () => {
     if (pendingSnapshot === null || (!skipCommitment && selectedCommitment === null)) return;
     const next = recordCheckIn(
       history,
       pendingSnapshot,
       skipCommitment ? null : selectedCommitment,
     );
-    const persisted = update((current) => ({ ...current, profile: { ...current.profile, debts: draftDebts }, checkIns: next }));
-    setSaved(true);
+    const persisted = await commit((current) => ({ ...current, profile: { ...current.profile, debts: draftDebts }, checkIns: next }), true);
+    setSaved(persisted.ok);
     setStorageWarning(
-      persisted
+      persisted.ok
         ? null
-        : "This browser could not save check-in history. Your updated balances remain available for this visit.",
+        : accountId ? (persisted.reason === "conflict" ? "Your cloud plan changed. Choose which version to keep before saving this check-in." : "This check-in has not synced yet. Its draft is saved in this browser for retry.") : "This browser could not save check-in history. Your updated balances remain available for this visit.",
     );
   };
 
@@ -442,7 +442,7 @@ export default function CheckInPage() {
               {storageWarning !== null && <p role="status" className="mt-3 text-sm text-danger">{storageWarning}</p>}
               {saved && storageWarning === null && (
                 <p role="status" className="mt-4 text-sm text-[#176347]">
-                  Saved only in this browser. <Link href="/report" className="font-semibold underline">Return to your report</Link>
+                  {accountId ? "Saved to your account." : "Saved in this browser."} <Link href="/report" className="font-semibold underline">Return to your report</Link>
                 </p>
               )}
             </div>
@@ -453,7 +453,7 @@ export default function CheckInPage() {
           <section className="panel" aria-labelledby="history-heading">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="eyebrow text-primary">Browser-local history</p>
+                <p className="eyebrow text-primary">{accountId ? "Account history" : "Browser-local history"}</p>
                 <h2 id="history-heading" className="mt-2 font-display text-2xl font-semibold">
                   Recent check-ins
                 </h2>
@@ -468,9 +468,9 @@ export default function CheckInPage() {
                   <button
                     type="button"
                     className="rounded-full bg-danger px-3 py-1.5 text-sm font-semibold text-white"
-                    onClick={() => {
-                      const cleared = update((current) => ({ ...current, checkIns: emptyCheckInState() }), true);
-                      if (cleared) {
+                    onClick={async () => {
+                      const cleared = await commit((current) => ({ ...current, checkIns: emptyCheckInState() }));
+                      if (cleared.ok) {
                         setReport(null);
                         setSaved(false);
                         setStorageWarning(null);

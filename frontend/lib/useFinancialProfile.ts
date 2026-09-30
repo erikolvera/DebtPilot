@@ -15,6 +15,6 @@ export function useFinancialProfile() {
     setDebts: (debts: FinancialDebtDraft[]) => patch({ debts }),
     setExtra: (extra: string) => patch({ extra }),
     setPreferredStrategy: (preferredStrategy: PreferredStrategy | null) => patch({ preferredStrategy }),
-    saveNow: retry,
+    saveNow: () => { void retry(); },
   };
 }
