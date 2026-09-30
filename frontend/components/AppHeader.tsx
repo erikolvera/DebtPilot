@@ -8,7 +8,6 @@ const LINKS = [
   ["/plan/cash-flow", "Plan"],
   ["/report", "Report"],
   ["/check-in", "Check in"],
-  ["/data", "Your data"],
 ] as const;
 
 export function AppHeader() {

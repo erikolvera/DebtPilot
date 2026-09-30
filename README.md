@@ -41,20 +41,15 @@ conditional future direction, not a current feature. The [roadmap](ROADMAP.md)
 defines the demand, privacy, migration, and deletion guardrails that must be met
 before implementation begins.
 
-## Backup and recovery
+## Local data
 
-Use **Your data** to download an unencrypted JSON backup of your editable plan,
-strategy, and retained monthly check-ins. Backups include unsaved in-memory
-changes and are manual snapshots, not automatic synchronization. Keep these
-financial files private and download a fresh copy after changes.
+The browser automatically saves the plan and check-in history together. Previous
+browser storage formats migrate after a successful save. Save failures show a
+warning and a retry action. If saved data cannot be read, automatic saving pauses
+to protect the original browser data.
 
-Restore validates a file locally, previews its contents, and asks before replacing
-both the plan and history. A failed restore preserves current data. Save failures
-show a warning with retry and backup actions. Unreadable saved data is preserved
-with automatic saving paused and a raw recovery download available.
-
-The browser stores the plan and history together; previous browser storage formats
-migrate automatically after a successful save. No accounts or database are needed.
+Manual JSON backup and restore have been removed. Account storage is not yet
+implemented in this codebase.
 
 ## Architecture
 
@@ -90,7 +85,7 @@ is sent to a generative model.
 The current codebase was verified with:
 
 - 249 backend tests and 99.08% coverage with branch coverage enabled.
-- 73 frontend unit tests for API/report orchestration, storage migrations,
+- 100 frontend unit tests for API/report orchestration, storage migrations,
   validation, formatting, chart geometry, and payoff-guidance selection.
 - CI gates for backend coverage plus frontend type checking, linting, tests,
   and the production Next.js build.
