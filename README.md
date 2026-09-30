@@ -17,9 +17,9 @@ accelerated payoff plan. If it is non-negative, the app compares minimum-only,
 Debt Snowball, and Debt Avalanche estimates using no more extra money than the
 budget supports.
 
-The project is deliberately anonymous and stateless: profiles are saved only
-in the browser, the API does not persist request data, and payoff guidance is
-calculated without a generative model.
+Guest profiles are saved in the browser. Optional accounts save editable plans
+and check-in history in Supabase. The calculation API remains stateless, and
+payoff guidance is calculated without a generative model.
 
 ## Features
 
@@ -34,22 +34,24 @@ calculated without a generative model.
 - A browser-local Snowball or Avalanche preference.
 - Estimated payoff dates, interest, total paid, and payoff chart.
 - Deterministic next-step recommendations.
-- Automatic browser-local saving; no account or external data connection.
+- Automatic browser-local saving for guests; optional account synchronization.
 
-Optional email accounts for private backup and cross-device continuity are a
-conditional future direction, not a current feature. The [roadmap](ROADMAP.md)
-defines the demand, privacy, migration, and deletion guardrails that must be met
-before implementation begins.
+Optional email-and-password accounts are available behind a feature flag for private backup and
+cross-device continuity. Guest planning remains available without sign-up.
 
-## Local data
+## Saving and account export
 
-The browser automatically saves the plan and check-in history together. Previous
-browser storage formats migrate after a successful save. Save failures show a
-warning and a retry action. If saved data cannot be read, automatic saving pauses
-to protect the original browser data.
+Guest plans and check-in history save automatically in this browser. Older
+storage formats migrate automatically. Unreadable stored data is preserved
+with automatic saving paused. Guest backup and restore are not available.
 
-Manual JSON backup and restore have been removed. Account storage is not yet
-implemented in this codebase.
+Account holders can export an unencrypted JSON snapshot from **Account**,
+including unsynced edits. Keep these financial files private. Account holders
+explicitly choose whether to upload the browser plan or use their cloud plan.
+Cloud data uses a separate user-specific browser cache during synchronization.
+
+See [account setup and release instructions](docs/accounts.md) to enable
+Supabase accounts, run integration tests, and prepare a hosted release.
 
 ## Architecture
 
@@ -57,11 +59,12 @@ implemented in this codebase.
 - **API:** FastAPI and Pydantic.
 - **Calculations:** framework-free Python packages under `backend/app/engine`
   and `backend/app/cashflow`.
-- **Storage:** browser `localStorage` only.
+- **Storage:** browser `localStorage` for guests; optional Supabase Auth and
+  PostgreSQL for account holders.
 
 ```text
 Next.js planner
-    ├── saves the editable profile in localStorage
+    ├── saves the editable profile locally or to an optional account
     └── POST /v1/financial-reports
             ├── normalize monthly cash flow
             ├── cap the extra payment at the affordable amount
@@ -84,8 +87,8 @@ is sent to a generative model.
 
 The current codebase was verified with:
 
-- 249 backend tests and 99.08% coverage with branch coverage enabled.
-- 100 frontend unit tests for API/report orchestration, storage migrations,
+- 260 backend tests and 98.72% coverage with branch coverage enabled.
+- 106 frontend unit tests for API/report orchestration, storage migrations,
   validation, formatting, chart geometry, and payoff-guidance selection.
 - CI gates for backend coverage plus frontend type checking, linting, tests,
   and the production Next.js build.
@@ -152,7 +155,8 @@ conventions.
    `{"status":"ok"}`. Interactive API documentation is available at
    `https://<backend-domain>/docs`.
 
-No database, account, or API key is required.
+The calculation API does not need a database or account key. Optional account
+storage is configured in the frontend deployment.
 
 ### 2. Create the frontend project
 

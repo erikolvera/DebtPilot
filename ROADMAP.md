@@ -1,35 +1,31 @@
 # DebtPilot roadmap
 
-This roadmap records product directions that are worth preserving but are not
-approved for immediate implementation. DebtPilot's current release remains
-anonymous and stateless: financial profiles and monthly check-ins stay in the
-user's browser.
+This roadmap records product direction and account guardrails. Guest planning
+remains anonymous and browser-local. Optional accounts use Supabase Auth and
+PostgreSQL for private saving across devices.
 
 ## Current milestone: local data protection
 
-The plan and check-in history are saved together in the browser. Save failures
-remain visible with a retry action. Manual JSON backup and restore have been
-removed ahead of account storage work.
+Guests retain automatic browser-local saving without manual JSON backup or
+restore. Account holders can export their editable plan and check-in history.
 
-Validate repeat-user demand for automatic recovery and cross-device continuity
-before promoting optional accounts below.
+Automatic recovery and cross-device continuity motivated the optional account
+implementation below.
 
-## Later, conditional: optional email accounts
+## Optional email accounts
 
-**Decision:** Consider optional passwordless email accounts when user demand
-justifies the privacy, security, and operational cost. The product value is
-private backup and cross-device continuity, not gating access to the planner.
+**Decision:** Add optional email-and-password accounts for private backup and
+cross-device continuity. Guest access remains available.
 
-Implementation should begin only after repeat users—especially people using
-monthly check-ins—demonstrate a recurring need for recovery or cross-device
-access. Until then, preserve the simpler browser-only experience.
+Account storage ships behind a disabled-by-default feature flag until local,
+staging, and production security and recovery checks pass.
 
 ### Product guardrails
 
 - Keep the complete planning and check-in experience available without an
   account. Offer sign-up only after someone has created data worth saving.
-- Use a managed authentication provider and passwordless email sign-in. Do not
-  build or store passwords in DebtPilot.
+- Use managed authentication for email verification, password handling, and
+  password recovery. Do not build or store passwords in DebtPilot.
 - Ask for explicit confirmation before copying browser-local data into an
   account. Never silently overwrite an existing cloud plan.
 - Persist only the editable financial profile and check-in history. Continue
@@ -52,15 +48,13 @@ access. Until then, preserve the simpler browser-only experience.
   cloud copy.
 - If local and cloud plans both exist, show an explicit choice instead of
   automatically selecting or merging one.
-- Choose the managed authentication and database provider in a dedicated
-  security and architecture review once this item is promoted from the
-  conditional roadmap.
+- Supabase Auth and PostgreSQL are the selected provider. Accounts remain
+  optional; guest planning stays available.
 
-### Acceptance criteria for promotion and delivery
+### Acceptance criteria for delivery
 
-Promote this item only when user feedback shows recurring demand for plan
-recovery or cross-device access and the team is prepared to support stored
-financial data.
+The user explicitly approved implementation of optional accounts. Hosted
+release remains gated on the setup and acceptance checks in `docs/accounts.md`.
 
 When delivered:
 

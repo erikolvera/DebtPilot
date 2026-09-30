@@ -1,0 +1,21 @@
+project_id = "debtpilot"
+
+[api]
+port = 55321
+
+[db]
+port = 55322
+
+[studio]
+port = 55323
+
+[local_smtp]
+port = 55324
+
+[auth]
+site_url = "http://localhost:3000"
+additional_redirect_urls = ["http://localhost:3000/auth/callback", "http://localhost:3000/account/reset"]
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true

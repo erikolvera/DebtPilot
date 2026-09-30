@@ -6,6 +6,8 @@ on:
   pull_request:
     paths:
       - "frontend/**"
+      - "supabase/**"
+      - "docs/accounts.md"
       - ".github/workflows/frontend.yml"
 
 jobs:
@@ -39,3 +41,28 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  cloud-integration:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start disposable local Supabase
+        run: supabase start -x logflare,vector,supavisor,realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime
+        working-directory: .
+      - name: Install
+        run: npm ci
+      - name: Account isolation and revision tests
+        run: npm run test:integration
+      - name: Account HTTP workflow tests
+        run: npm run test:e2e

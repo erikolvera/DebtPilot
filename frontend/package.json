@@ -4,15 +4,20 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:cloud": "node scripts/dev-cloud.mjs",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "node scripts/test-cloud.mjs",
+    "test:e2e": "node scripts/test-http.mjs",
     "gen:api": "openapi-typescript http://127.0.0.1:8000/openapi.json -o lib/api-types.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.2",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"
