@@ -53,7 +53,7 @@ export const REQUEST_TIMEOUT_MS = 15000;
  * not served from the API's own origin, and it fails as a confusing 404 rather
  * than a missing-configuration error. `||` catches it. The trailing-slash strip
  * is the other half: `https://api.example.com/` would otherwise produce
- * `https://api.example.com//v1/payoff-plans`.
+ * `https://api.example.com//v1/financial-reports`.
  */
 export function apiBase(
   raw: string | undefined = process.env.NEXT_PUBLIC_API_BASE_URL,

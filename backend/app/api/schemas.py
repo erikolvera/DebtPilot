@@ -118,14 +118,6 @@ class DebtIn(BaseModel):
     minimum_payment: Money = Field(ge=0, le=MONEY_MAX)
 
 
-class PayoffPlanRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    debts: list[DebtIn] = Field(max_length=MAX_DEBTS_PER_USER)
-    extra_monthly_payment: Money = Field(ge=0, le=MONEY_MAX)
-    start_month: str = Field(pattern=MONTH_PATTERN)
-
-
 class DebtPayoffOut(BaseModel):
     debt_id: str
     name: str

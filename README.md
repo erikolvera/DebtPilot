@@ -75,9 +75,8 @@ Next.js planner
 The browser posts one financial snapshot to `POST /v1/financial-reports`. The
 API calculates cash flow first, caps the requested extra payment at the
 available amount, and then calls the payoff engine. It also compares two
-faster, affordable payment options when unassigned cash remains.
-`POST /v1/payoff-plans` remains available as a lower-level debt-only
-calculation endpoint.
+faster, affordable payment options when unassigned cash remains. It is the
+only calculation endpoint.
 
 Money crosses the API as decimal strings. The backend uses `Decimal` and rounds
 to cents explicitly. Payoff guidance is deterministic, and no financial data
@@ -87,8 +86,8 @@ is sent to a generative model.
 
 The current codebase was verified with:
 
-- 260 backend tests and 98.72% coverage with branch coverage enabled.
-- 106 frontend unit tests for API/report orchestration, storage migrations,
+- 236 backend tests and 98.68% coverage with branch coverage enabled.
+- 100 frontend unit tests for API/report orchestration, storage migrations,
   validation, formatting, chart geometry, and payoff-guidance selection.
 - CI gates for backend coverage plus frontend type checking, linting, tests,
   and the production Next.js build.

@@ -16,19 +16,17 @@ def client() -> TestClient:
     return TestClient(create_app())
 
 
-def portfolio_body(**overrides) -> dict:
-    body = {
+def report_body() -> dict:
+    return {
+        "incomes": [],
+        "expenses": [],
         "debts": [
             {"id": "a", "name": "Store card", "balance": "500.00",
              "apr": "5.00", "minimum_payment": "25.00"},
-            {"id": "b", "name": "Visa", "balance": "2000.00",
-             "apr": "25.00", "minimum_payment": "50.00"},
         ],
-        "extra_monthly_payment": "200.00",
+        "requested_extra_monthly_payment": "0.00",
         "start_month": "2026-09",
     }
-    body.update(overrides)
-    return body
 
 
 def test_health_returns_ok(client):
@@ -65,83 +63,6 @@ def test_cors_headers_are_sent_for_an_allowed_origin(monkeypatch):
     assert response.headers["access-control-allow-origin"] == "https://app.example"
 
 
-def test_happy_path_returns_all_three_scenarios(client):
-    response = client.post("/v1/payoff-plans", json=portfolio_body())
-    assert response.status_code == 200
-    body = response.json()
-    assert set(body["scenarios"]) == {"snowball", "avalanche", "baseline"}
-    assert body["start_month"] == "2026-09"
-
-
-def test_money_comes_back_as_strings(client):
-    body = client.post("/v1/payoff-plans", json=portfolio_body()).json()
-    assert isinstance(body["scenarios"]["avalanche"]["total_interest_paid"], str)
-    assert isinstance(body["comparison"]["interest_saved_avalanche_vs_snowball"], str)
-
-
-def test_comparison_carries_every_delta(client):
-    comparison = client.post("/v1/payoff-plans", json=portfolio_body()).json()["comparison"]
-    assert set(comparison) == {
-        "interest_saved_snowball_vs_baseline",
-        "interest_saved_avalanche_vs_baseline",
-        "interest_saved_avalanche_vs_snowball",
-        "months_saved_snowball_vs_baseline",
-        "months_saved_avalanche_vs_baseline",
-        "months_saved_avalanche_vs_snowball",
-    }
-
-
-def test_empty_portfolio_returns_zero_month_scenarios(client):
-    body = client.post("/v1/payoff-plans", json=portfolio_body(debts=[])).json()
-    assert body["scenarios"]["avalanche"]["months_to_payoff"] == 0
-    assert body["scenarios"]["avalanche"]["payoff_month"] is None
-
-
-def test_route_is_versioned(client):
-    assert client.post("/payoff-plans", json=portfolio_body()).status_code == 404
-
-
-def test_money_as_a_json_number_is_a_422(client):
-    body = portfolio_body()
-    body["debts"][0]["balance"] = 500.00
-    response = client.post("/v1/payoff-plans", json=body)
-    assert response.status_code == 422
-    assert "JSON string" in response.text
-
-
-def test_duplicate_debt_ids_are_a_422_from_the_engine(client):
-    # Pydantic cannot see this; the engine raises InvalidDebt and the handler
-    # turns it into a 422 rather than letting it escape as a 500.
-    duplicated = portfolio_body()
-    duplicated["debts"][1]["id"] = "a"
-    response = client.post("/v1/payoff-plans", json=duplicated)
-    assert response.status_code == 422
-    entry = response.json()["detail"][0]
-    assert entry["type"] == "invalid_debt"
-    # FastAPI's own 422 entries always carry a `loc`. Without one here, a
-    # client written against the framework envelope has two shapes to parse.
-    assert entry["loc"] == ["body", "debts"]
-
-
-def test_never_pays_off_returns_200_not_an_error(client):
-    # The single most important thing the product can tell this user. Returning
-    # 4xx would route it into every client's error path.
-    body = client.post(
-        "/v1/payoff-plans",
-        json=portfolio_body(
-            debts=[{"id": "a", "name": "Maxed card", "balance": "10000.00",
-                    "apr": "24.00", "minimum_payment": "100.00"}],
-            extra_monthly_payment="3000.00",
-        ),
-    )
-    assert body.status_code == 200
-    payload = body.json()
-    assert payload["scenarios"]["baseline"]["outcome"] == "never_pays_off"
-    assert payload["scenarios"]["baseline"]["payoff_month"] is None
-    assert payload["scenarios"]["baseline"]["underwater_debt_ids"] == ["a"]
-    assert payload["comparison"]["interest_saved_avalanche_vs_baseline"] is None
-
-
 def test_cors_does_not_advertise_credentialed_requests(monkeypatch):
     # There is no auth and no cookie in this slice, so allow_credentials would
     # grant nothing today and become a footgun the moment ALLOWED_ORIGINS=*.
@@ -172,7 +93,7 @@ def test_a_body_over_the_size_cap_is_a_413(client):
     # and parsed, so it is not a request-size cap. This is.
     oversized = b'{"padding": "' + b"x" * (MAX_BODY_BYTES + 1) + b'"}'
     response = client.post(
-        "/v1/payoff-plans",
+        "/v1/financial-reports",
         content=oversized,
         headers={"content-type": "application/json"},
     )
@@ -183,7 +104,7 @@ def test_a_body_over_the_size_cap_is_a_413(client):
 
 
 def test_a_body_under_the_size_cap_is_processed_normally(client):
-    response = client.post("/v1/payoff-plans", json=portfolio_body())
+    response = client.post("/v1/financial-reports", json=report_body())
     assert response.status_code == 200
     assert int(response.request.headers["content-length"]) <= MAX_BODY_BYTES
 
@@ -211,7 +132,7 @@ def test_a_chunked_body_over_the_size_cap_is_a_413_before_the_app_runs():
     scope = {
         "type": "http",
         "method": "POST",
-        "path": "/v1/payoff-plans",
+        "path": "/v1/financial-reports",
         "headers": [],
     }
     asyncio.run(BodySizeLimitMiddleware(downstream)(scope, receive, send))
@@ -240,7 +161,7 @@ def test_openapi_types_request_money_as_a_string():
     # A BeforeValidator does not change the generated schema on its own, so
     # without json_schema_input_type this advertises `number | string` while
     # the code rejects numbers — and the frontend's types are generated here.
-    schema = create_app().openapi()["components"]["schemas"]["DebtIn"]
+    schema = create_app().openapi()["components"]["schemas"]["FinancialReportDebtIn"]
     balance = schema["properties"]["balance"]
     assert balance.get("type") == "string", balance
     assert "anyOf" not in balance

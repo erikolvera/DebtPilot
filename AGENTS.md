@@ -47,7 +47,8 @@ npm run dev
 
 - `backend/app/cashflow/`: pure monthly cash-flow calculation.
 - `backend/app/engine/`: pure payoff engine with no FastAPI or Pydantic imports.
-- `backend/app/api/`: schemas, mapping, and two stateless POST endpoints.
+- `backend/app/api/`: schemas, mapping, and one stateless POST endpoint
+  (`/v1/financial-reports`).
 - `frontend/`: Next.js planning and report pages, generated API types, and
   browser-local storage.
 
