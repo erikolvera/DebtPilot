@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest";
 import { seedFinancialProfile } from "./seed";
 import {
   loadFinancialProfile,
-  saveFinancialProfile,
   type FinancialProfile,
   type StorageLike,
 } from "./profileStorage";
@@ -11,14 +10,12 @@ function stub(entries: Record<string, string> = {}): StorageLike {
   const store = new Map(Object.entries(entries));
   return {
     getItem: (key) => store.get(key) ?? null,
-    setItem: (key, value) => void store.set(key, value),
   };
 }
 
 const FALLBACK = seedFinancialProfile();
 
 test("a complete financial profile round-trips", () => {
-  const storage = stub();
   const saved: FinancialProfile = {
     incomes: [{ id: "pay", name: "Pay", amount: "461.54", frequency: "biweekly" }],
     expenses: [
@@ -37,7 +34,7 @@ test("a complete financial profile round-trips", () => {
     extra: "50.00",
     preferredStrategy: "snowball",
   };
-  saveFinancialProfile(storage, saved);
+  const storage = stub({ "debtpilot.financial-profile.v4": JSON.stringify(saved) });
   expect(loadFinancialProfile(storage, FALLBACK)).toEqual(saved);
 });
 
@@ -133,11 +130,8 @@ describe("invalid or unavailable storage", () => {
   test("falls back when storage is absent or throws", () => {
     const hostile: StorageLike = {
       getItem: () => { throw new DOMException("denied"); },
-      setItem: () => { throw new DOMException("denied"); },
     };
     expect(loadFinancialProfile(null, FALLBACK)).toEqual(FALLBACK);
     expect(loadFinancialProfile(hostile, FALLBACK)).toEqual(FALLBACK);
-    expect(() => saveFinancialProfile(null, FALLBACK)).not.toThrow();
-    expect(() => saveFinancialProfile(hostile, FALLBACK)).not.toThrow();
   });
 });

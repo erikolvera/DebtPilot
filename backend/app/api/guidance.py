@@ -6,7 +6,7 @@ from decimal import Decimal
 from app.engine import Debt, Outcome, PlanComparison, PlanSummary, compute_plans
 from app.engine.money import to_cents
 
-from .dates import month_label
+from .mappers import payoff_month
 from .schemas import (
     CompactOptionImpactOut,
     PayoffGuidanceOut,
@@ -55,11 +55,7 @@ def _impact(
     )
     return CompactOptionImpactOut(
         outcome=option.outcome.value,
-        payoff_month=(
-            month_label(start_month, option.months_to_payoff)
-            if option.months_to_payoff is not None and option.months_to_payoff > 0
-            else None
-        ),
+        payoff_month=payoff_month(option.months_to_payoff, start_month),
         months_to_payoff=option.months_to_payoff,
         total_interest_paid=option.total_interest_paid,
         months_saved_vs_current=(

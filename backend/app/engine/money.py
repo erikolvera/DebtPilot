@@ -19,7 +19,3 @@ def to_cents(value: Decimal) -> Decimal:
     """
     return value.quantize(CENTS, rounding=ROUND_HALF_UP)
 
-
-def to_rate_precision(value: Decimal) -> Decimal:
-    """Round an APR percentage to two places, matching ``numeric(5,2)``."""
-    return value.quantize(CENTS, rounding=ROUND_HALF_UP)

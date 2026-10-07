@@ -4,8 +4,8 @@ Pure Python. No framework imports, no I/O, no clock access. Every number the
 product shows a user originates here.
 """
 
-from .errors import InvalidDebt
 from .models import (
+    InvalidDebt,
     Debt,
     DebtMonth,
     DebtPayoff,
@@ -17,7 +17,7 @@ from .models import (
     Schedule,
     Strategy,
 )
-from .plans import compute_plans, compute_schedules, summarize, summarize_schedules
+from .plans import compute_plans, summarize
 from .simulator import simulate
 
 __all__ = [
@@ -33,8 +33,6 @@ __all__ = [
     "Schedule",
     "Strategy",
     "compute_plans",
-    "compute_schedules",
     "simulate",
     "summarize",
-    "summarize_schedules",
 ]

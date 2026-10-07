@@ -2,8 +2,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.engine.errors import InvalidDebt
-from app.engine.models import Debt, validate_portfolio
+from app.engine.models import Debt, InvalidDebt, validate_portfolio
 
 
 def make_debt(**overrides) -> Debt:
