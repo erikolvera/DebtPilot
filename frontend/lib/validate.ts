@@ -18,14 +18,14 @@ export type FieldErrors = Partial<Record<keyof DebtDraft, string>>;
 /** A plain decimal: no sign, no separators, no exponent, at most two decimals. */
 const DECIMAL = /^\d+(\.\d{1,2})?$/;
 
-const MONEY_MAX = 99999999.99;
+export const MONEY_MAX = 99999999.99;
 // A financial report may combine up to 50 normalized income rows. Its extra
 // payment therefore has a wider contract than any individual money field.
 const REPORT_EXTRA_MAX = 21666666664.50;
 const APR_MAX = 999.99;
 /** Mirrors the server's MAX_DEBTS_PER_USER. */
 export const MAX_DEBTS = 20;
-const MAX_NAME = 120;
+export const MAX_NAME = 120;
 const EXPENSE_CATEGORIES = new Set([
   "housing",
   "food",
@@ -39,7 +39,7 @@ const EXPENSE_CATEGORIES = new Set([
   "other",
 ]);
 
-function moneyError(value: string, max: number, label: string): string | undefined {
+export function moneyError(value: string, max: number, label: string): string | undefined {
   if (!DECIMAL.test(value)) return `${label} must be a plain amount, like 1200.50`;
   // Bounds comparison only; the value that travels is still the string.
   if (Number(value) > max) return `${label} is too large`;

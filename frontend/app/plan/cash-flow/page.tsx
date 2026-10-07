@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ExpenseTable } from "@/components/ExpenseTable";
-import { IncomeTable } from "@/components/IncomeTable";
+import { ExpenseTable, IncomeTable } from "@/components/CashFlowTable";
 import { PlanSteps } from "@/components/PlanSteps";
 import { useFinancialProfile } from "@/lib/useFinancialProfile";
 
