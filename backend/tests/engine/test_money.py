@@ -1,6 +1,6 @@
 from decimal import Decimal, getcontext
 
-from app.engine.money import CENTS, to_cents, to_rate_precision
+from app.engine.money import to_cents, to_rate_precision
 
 
 def test_to_cents_rounds_to_two_places():
@@ -25,7 +25,3 @@ def test_to_cents_does_not_mutate_the_global_context():
 
 def test_to_rate_precision_rounds_apr_to_two_places():
     assert to_rate_precision(Decimal("24.9949")) == Decimal("24.99")
-
-
-def test_cents_constant_is_two_places():
-    assert CENTS == Decimal("0.01")

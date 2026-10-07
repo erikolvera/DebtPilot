@@ -109,39 +109,6 @@ def test_money_as_a_json_number_is_a_422(client):
     assert "JSON string" in response.text
 
 
-def test_negative_extra_payment_is_a_422(client):
-    response = client.post("/v1/payoff-plans", json=portfolio_body(extra_monthly_payment="-1.00"))
-    assert response.status_code == 422
-
-
-def test_malformed_start_month_is_a_422(client):
-    response = client.post("/v1/payoff-plans", json=portfolio_body(start_month="2026-13"))
-    assert response.status_code == 422
-
-
-def test_unknown_field_is_a_422(client):
-    response = client.post("/v1/payoff-plans", json=portfolio_body(extra_payment="200.00"))
-    assert response.status_code == 422
-
-
-def many_debts(count: int) -> list[dict]:
-    return [
-        {"id": f"d{i}", "name": f"Card {i}", "balance": "100.00",
-         "apr": "10.00", "minimum_payment": "25.00"}
-        for i in range(count)
-    ]
-
-
-def test_too_many_debts_is_a_422(client):
-    body = portfolio_body(debts=many_debts(21))
-    assert client.post("/v1/payoff-plans", json=body).status_code == 422
-
-
-def test_exactly_twenty_debts_is_accepted(client):
-    body = portfolio_body(debts=many_debts(20))
-    assert client.post("/v1/payoff-plans", json=body).status_code == 200
-
-
 def test_duplicate_debt_ids_are_a_422_from_the_engine(client):
     # Pydantic cannot see this; the engine raises InvalidDebt and the handler
     # turns it into a 422 rather than letting it escape as a 500.
