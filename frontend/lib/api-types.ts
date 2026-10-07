@@ -21,23 +21,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/payoff-plans": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Create Payoff Plan */
-        post: operations["create_payoff_plan_v1_payoff_plans_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/financial-reports": {
         parameters: {
             query?: never;
@@ -147,19 +130,6 @@ export interface components {
             months_saved_avalanche_vs_baseline: number | null;
             /** Months Saved Avalanche Vs Snowball */
             months_saved_avalanche_vs_snowball: number | null;
-        };
-        /** DebtIn */
-        DebtIn: {
-            /** Id */
-            id: string;
-            /** Name */
-            name: string;
-            /** Balance */
-            balance: string;
-            /** Apr */
-            apr: string;
-            /** Minimum Payment */
-            minimum_payment: string;
         };
         /** DebtPaymentBudgetOut */
         DebtPaymentBudgetOut: {
@@ -305,15 +275,6 @@ export interface components {
             snowball: components["schemas"]["CompactOptionImpactOut"];
             avalanche: components["schemas"]["CompactOptionImpactOut"];
         };
-        /** PayoffPlanRequest */
-        PayoffPlanRequest: {
-            /** Debts */
-            debts: components["schemas"]["DebtIn"][];
-            /** Extra Monthly Payment */
-            extra_monthly_payment: string;
-            /** Start Month */
-            start_month: string;
-        };
         /** PayoffPlanResponse */
         PayoffPlanResponse: {
             /** Start Month */
@@ -416,39 +377,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
-                };
-            };
-        };
-    };
-    create_payoff_plan_v1_payoff_plans_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["PayoffPlanRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PayoffPlanResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

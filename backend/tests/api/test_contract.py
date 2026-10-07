@@ -1,4 +1,4 @@
-"""The two properties the API layer must never break.
+"""The two properties the API layer must never break, checked on the report route.
 
 The first makes the deliberate validation overlap safe: Pydantic re-checks
 rules the engine also enforces, and if the two ever disagree the result must
@@ -8,12 +8,13 @@ The second guards the one bug class this layer can uniquely introduce: a
 mapper that silently drops a field or rounds a delta.
 """
 
+import json
 from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.api.main import create_app
+from app.api.main import create_app, handle_invalid_debt
 from app.engine import Debt, InvalidDebt, compute_plans
 
 
@@ -23,7 +24,23 @@ def client() -> TestClient:
 
 
 def body(debts, extra="200.00", start="2026-09") -> dict:
-    return {"debts": debts, "extra_monthly_payment": extra, "start_month": start}
+    # Ample income and no expenses, so the requested extra is fully affordable
+    # and the report's payoff plan runs with exactly ``extra``.
+    return {
+        "incomes": [
+            {"id": "pay", "name": "Pay", "amount": "5000.00", "frequency": "monthly"}
+        ],
+        "expenses": [],
+        "debts": debts,
+        "requested_extra_monthly_payment": extra,
+        "start_month": start,
+    }
+
+
+def plan(client, debts=None) -> dict:
+    payload = client.post("/v1/financial-reports", json=body(debts or WIRE_PORTFOLIO))
+    assert payload.status_code == 200, payload.text
+    return payload.json()["payoff_plan"]
 
 
 WIRE_PORTFOLIO = [
@@ -66,15 +83,15 @@ REJECTED_INPUTS = [
 
 @pytest.mark.parametrize("debts,extra", REJECTED_INPUTS)
 def test_every_rejected_input_is_a_422_never_a_500(client, debts, extra):
-    response = client.post("/v1/payoff-plans", json=body(debts, extra))
+    response = client.post("/v1/financial-reports", json=body(debts, extra))
     assert response.status_code == 422, response.text
     assert "detail" in response.json()
 
 
 def test_duplicate_ids_really_would_raise_without_the_handler():
-    # Proves the 422 above comes from a registered handler, not from Pydantic
-    # happening to catch it: the engine genuinely raises on this input, so
-    # without the handler the same request would surface as a 500.
+    # The engine genuinely raises on this input. Pydantic rejects it first on
+    # the report route, so the handler below is the safety net if the two
+    # ever disagree.
     with pytest.raises(InvalidDebt):
         compute_plans(
             [
@@ -85,9 +102,33 @@ def test_duplicate_ids_really_would_raise_without_the_handler():
         )
 
 
+def test_invalid_debt_handler_answers_in_fastapis_422_envelope():
+    # FastAPI's own 422 entries always carry a `loc`. Without one here, a
+    # client written against the framework envelope has two shapes to parse.
+    response = handle_invalid_debt(None, InvalidDebt("duplicate debt id 'a'"))
+    assert response.status_code == 422
+    assert json.loads(response.body)["detail"] == [
+        {"type": "invalid_debt", "loc": ["body", "debts"], "msg": "duplicate debt id 'a'"}
+    ]
+
+
+def test_money_and_every_comparison_delta_cross_the_wire(client):
+    payload = plan(client)
+    assert isinstance(payload["scenarios"]["avalanche"]["total_interest_paid"], str)
+    assert isinstance(payload["comparison"]["interest_saved_avalanche_vs_snowball"], str)
+    assert set(payload["comparison"]) == {
+        "interest_saved_snowball_vs_baseline",
+        "interest_saved_avalanche_vs_baseline",
+        "interest_saved_avalanche_vs_snowball",
+        "months_saved_snowball_vs_baseline",
+        "months_saved_avalanche_vs_baseline",
+        "months_saved_avalanche_vs_snowball",
+    }
+
+
 def test_response_numbers_equal_the_engines_own_output(client):
     expected = compute_plans(ENGINE_PORTFOLIO, Decimal("200.00"))
-    payload = client.post("/v1/payoff-plans", json=body(WIRE_PORTFOLIO)).json()
+    payload = plan(client)
 
     for name, summary in (
         ("snowball", expected.snowball),
@@ -112,7 +153,7 @@ def test_response_numbers_equal_the_engines_own_output(client):
 
 def test_per_debt_payoff_numbers_survive_the_mapping(client):
     expected = compute_plans(ENGINE_PORTFOLIO, Decimal("200.00"))
-    payload = client.post("/v1/payoff-plans", json=body(WIRE_PORTFOLIO)).json()
+    payload = plan(client)
 
     for wire, engine_payoff in zip(
         payload["scenarios"]["avalanche"]["debt_payoffs"],
@@ -130,7 +171,7 @@ def test_monthly_total_money_survives_the_mapping(client):
     # mapper would pass the whole suite: nothing else compares these values
     # against the engine, only their count.
     expected = compute_plans(ENGINE_PORTFOLIO, Decimal("200.00"))
-    payload = client.post("/v1/payoff-plans", json=body(WIRE_PORTFOLIO)).json()
+    payload = plan(client)
 
     for wire, engine_total in zip(
         payload["scenarios"]["avalanche"]["monthly_totals"],

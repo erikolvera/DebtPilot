@@ -1,7 +1,7 @@
 """Application factory.
 
 Everything process-shaped lives here: CORS, exception handlers, and the
-health check. The payoff-plan route itself lives in routers/payoff_plans.py.
+health check. The report route itself lives in routers/financial_reports.py.
 """
 
 import os
@@ -15,7 +15,6 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from app.engine import InvalidDebt
 
 from .routers import financial_reports
-from .routers import payoff_plans
 
 DEFAULT_ORIGIN = "http://localhost:3000"
 
@@ -140,7 +139,6 @@ def create_app() -> FastAPI:
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    app.include_router(payoff_plans.router, prefix="/v1")
     app.include_router(financial_reports.router, prefix="/v1")
     return app
 

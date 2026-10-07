@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 from pydantic import ValidationError
 
-from app.api.schemas import DebtIn, PayoffPlanRequest
+from app.api.schemas import DebtIn, FinancialReportRequest
 
 
 def debt_payload(**overrides) -> dict:
@@ -20,8 +20,10 @@ def debt_payload(**overrides) -> dict:
 
 def request_payload(**overrides) -> dict:
     payload = {
+        "incomes": [],
+        "expenses": [],
         "debts": [debt_payload()],
-        "extra_monthly_payment": "200.00",
+        "requested_extra_monthly_payment": "200.00",
         "start_month": "2026-09",
     }
     payload.update(overrides)
@@ -81,7 +83,9 @@ def test_money_exactly_at_the_ceiling_is_allowed():
 
 def test_extra_payment_above_the_numeric_10_2_ceiling_is_rejected():
     with pytest.raises(ValidationError):
-        PayoffPlanRequest(**request_payload(extra_monthly_payment="1e1000"))
+        FinancialReportRequest(
+            **request_payload(requested_extra_monthly_payment="1e1000")
+        )
 
 
 def test_empty_id_is_rejected():
@@ -97,26 +101,26 @@ def test_unknown_field_is_rejected():
 
 
 def test_valid_request_parses():
-    request = PayoffPlanRequest(**request_payload())
+    request = FinancialReportRequest(**request_payload())
     assert request.start_month == "2026-09"
-    assert request.extra_monthly_payment == Decimal("200.00")
+    assert request.requested_extra_monthly_payment == Decimal("200.00")
     assert len(request.debts) == 1
 
 
 def test_empty_debt_list_is_valid():
     # "No debts yet" is the normal state of a new account, not an error.
-    assert PayoffPlanRequest(**request_payload(debts=[])).debts == []
+    assert FinancialReportRequest(**request_payload(debts=[])).debts == []
 
 
 def test_more_than_twenty_debts_is_rejected():
     with pytest.raises(ValidationError):
-        PayoffPlanRequest(
+        FinancialReportRequest(
             **request_payload(debts=[debt_payload(id=f"d{i}") for i in range(21)])
         )
 
 
 def test_exactly_twenty_debts_is_allowed():
-    request = PayoffPlanRequest(
+    request = FinancialReportRequest(
         **request_payload(debts=[debt_payload(id=f"d{i}") for i in range(20)])
     )
     assert len(request.debts) == 20
@@ -125,12 +129,14 @@ def test_exactly_twenty_debts_is_allowed():
 @pytest.mark.parametrize("bad", ["2026-13", "26-09", "2026-9", "2026-09-14", ""])
 def test_malformed_start_month_is_rejected(bad):
     with pytest.raises(ValidationError):
-        PayoffPlanRequest(**request_payload(start_month=bad))
+        FinancialReportRequest(**request_payload(start_month=bad))
 
 
 def test_negative_extra_payment_is_rejected():
     with pytest.raises(ValidationError):
-        PayoffPlanRequest(**request_payload(extra_monthly_payment="-1.00"))
+        FinancialReportRequest(
+            **request_payload(requested_extra_monthly_payment="-1.00")
+        )
 
 
 import json
