@@ -63,7 +63,7 @@ must preserve export, deletion, and each user's data isolation.
 
 Use this workflow for every feature implementation or removal:
 
-1. Fetch the latest `origin/main` and create a focused `codex/` branch from it.
+1. Fetch the latest `origin/main` and create a focused, descriptively named branch from it.
    Preserve unrelated local work; use an isolated worktree when needed.
 2. Implement the change and run the relevant tests, type checks, lint, and build.
    Add meaningful coverage for changed behavior and review migrations, data
@@ -72,7 +72,7 @@ Use this workflow for every feature implementation or removal:
    Include only intended files; exclude secrets and generated artifacts.
 4. Push the branch to GitHub without rewriting shared history.
 5. Open a PR targeting `main` with a summary, test evidence, and any migration,
-   rollout, or rollback steps. Attach the PR to the current Codex task.
+   rollout, or rollback steps.
 6. Review the PR diff, address feedback and failures, and rerun affected checks.
    Merge once required CI checks pass, review findings are resolved, and branch
    protection permits it. Never bypass required reviews or failing checks.
