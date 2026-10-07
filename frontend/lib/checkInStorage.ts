@@ -10,7 +10,6 @@ import type {
 } from "./checkIn";
 import type { PreferredStrategy } from "./profileStorage";
 
-export type CheckInStorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 export type CheckInDebtSnapshot = { id: string; balance: string };
 export type CheckInPortfolioSnapshot = {
   month: string;
@@ -184,49 +183,6 @@ export function isState(value: unknown): value is CheckInState {
     Array.isArray(value.celebratedPaidOffDebtIds) &&
     value.celebratedPaidOffDebtIds.every((id) => typeof id === "string")
   );
-}
-
-export function loadCheckInState(storage: CheckInStorageLike | null): CheckInState {
-  if (storage === null) return emptyCheckInState();
-  try {
-    const raw = storage.getItem(CHECK_IN_KEY);
-    if (raw === null) return emptyCheckInState();
-    const parsed: unknown = JSON.parse(raw);
-    return isState(parsed) ? parsed : emptyCheckInState();
-  } catch {
-    return emptyCheckInState();
-  }
-}
-
-export function saveCheckInState(
-  storage: CheckInStorageLike | null,
-  state: CheckInState,
-): boolean {
-  if (storage === null) return false;
-  try {
-    storage.setItem(CHECK_IN_KEY, JSON.stringify(state));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function clearCheckInState(storage: CheckInStorageLike | null): boolean {
-  if (storage === null) return false;
-  try {
-    storage.removeItem(CHECK_IN_KEY);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export function browserCheckInStorage(): CheckInStorageLike | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
 }
 
 export function latestCheckIn(state: CheckInState): CheckInSnapshot | null {

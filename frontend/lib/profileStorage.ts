@@ -6,7 +6,7 @@ import type {
   IncomeDraft,
 } from "./api";
 
-export type StorageLike = Pick<Storage, "getItem" | "setItem">;
+export type StorageLike = Pick<Storage, "getItem">;
 
 export type PreferredStrategy = "snowball" | "avalanche";
 
@@ -196,25 +196,5 @@ export function loadFinancialProfile(
     return migrateLegacy(JSON.parse(legacy)) ?? fallback;
   } catch {
     return fallback;
-  }
-}
-
-export function saveFinancialProfile(
-  storage: StorageLike | null,
-  profile: FinancialProfile,
-): void {
-  if (!storage) return;
-  try {
-    storage.setItem(PROFILE_KEY, JSON.stringify(profile));
-  } catch {
-    // Storage is a convenience. The in-memory report still works.
-  }
-}
-
-export function browserStorage(): StorageLike | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
   }
 }

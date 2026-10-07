@@ -2,9 +2,7 @@ import { describe, expect, test } from "vitest";
 import type { DebtDraft } from "./api";
 import {
   debtErrors,
-  extraError,
   isFinancialReportSendable,
-  isSendable,
   reportExtraError,
 } from "./validate";
 
@@ -56,24 +54,17 @@ describe("debtErrors", () => {
   });
 });
 
-describe("extraError", () => {
+describe("reportExtraError", () => {
   test("accepts zero and a plain decimal", () => {
-    expect(extraError("0.00")).toBeNull();
-    expect(extraError("200")).toBeNull();
+    expect(reportExtraError("0.00")).toBeNull();
+    expect(reportExtraError("200")).toBeNull();
   });
 
   test("rejects an empty or malformed amount", () => {
-    expect(extraError("")).not.toBeNull();
-    expect(extraError("-1")).not.toBeNull();
+    expect(reportExtraError("")).not.toBeNull();
+    expect(reportExtraError("-1")).not.toBeNull();
   });
 
-  test("keeps the debt-only endpoint ceiling", () => {
-    expect(extraError("99999999.99")).toBeNull();
-    expect(extraError("100000000.00")).not.toBeNull();
-  });
-});
-
-describe("reportExtraError", () => {
   test("accepts the report-wide ceiling without widening individual fields", () => {
     expect(reportExtraError("21666666664.50")).toBeNull();
     expect(reportExtraError("21666666664.51")).not.toBeNull();
@@ -83,30 +74,5 @@ describe("reportExtraError", () => {
   test("is used by financial-report sendability", () => {
     expect(isFinancialReportSendable([], [], [], "21666666664.50")).toBe(true);
     expect(isFinancialReportSendable([], [], [], "21666666664.51")).toBe(false);
-  });
-});
-
-describe("isSendable", () => {
-  test("is false while any row is mid-edit", () => {
-    expect(isSendable([{ ...OK, balance: "" }], "200.00")).toBe(false);
-  });
-
-  test("is false for an empty portfolio", () => {
-    // Nothing to plan. The page shows its empty state instead of a request.
-    expect(isSendable([], "200.00")).toBe(false);
-  });
-
-  test("is false above the server's 20-debt cap", () => {
-    const many = Array.from({ length: 21 }, (_, i) => ({ ...OK, id: String(i) }));
-    expect(isSendable(many, "200.00")).toBe(false);
-  });
-
-  test("is true at exactly the 20-debt cap", () => {
-    const twenty = Array.from({ length: 20 }, (_, i) => ({ ...OK, id: String(i) }));
-    expect(isSendable(twenty, "200.00")).toBe(true);
-  });
-
-  test("is true for a valid portfolio", () => {
-    expect(isSendable([OK], "200.00")).toBe(true);
   });
 });

@@ -66,19 +66,8 @@ export function debtErrors(debt: DebtDraft): FieldErrors {
   return errors;
 }
 
-export function extraError(extra: string): string | null {
-  return moneyError(extra, MONEY_MAX, "Extra payment") ?? null;
-}
-
 export function reportExtraError(extra: string): string | null {
   return moneyError(extra, REPORT_EXTRA_MAX, "Extra payment") ?? null;
-}
-
-/** Whether this portfolio is worth sending. */
-export function isSendable(debts: DebtDraft[], extra: string): boolean {
-  if (debts.length === 0 || debts.length > MAX_DEBTS) return false;
-  if (extraError(extra) !== null) return false;
-  return debts.every((debt) => Object.keys(debtErrors(debt)).length === 0);
 }
 
 function namedAmountIsValid(row: { name: string; monthly_amount: string }): boolean {

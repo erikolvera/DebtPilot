@@ -13,7 +13,7 @@ from .schemas import (
 )
 
 
-def _payoff_month(months_to_payoff: int | None, start_month: str) -> str | None:
+def payoff_month(months_to_payoff: int | None, start_month: str) -> str | None:
     if months_to_payoff is None or months_to_payoff < 1:
         return None
     return month_label(start_month, months_to_payoff)
@@ -24,7 +24,7 @@ def _scenario(summary: PlanSummary, start_month: str) -> ScenarioOut:
         strategy=summary.strategy.value,
         outcome=summary.outcome.value,
         months_to_payoff=summary.months_to_payoff,
-        payoff_month=_payoff_month(summary.months_to_payoff, start_month),
+        payoff_month=payoff_month(summary.months_to_payoff, start_month),
         underwater_debt_ids=list(summary.underwater_debt_ids),
         total_interest_paid=summary.total_interest_paid,
         total_paid=summary.total_paid,

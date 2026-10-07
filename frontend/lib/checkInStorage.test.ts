@@ -1,30 +1,16 @@
 import { describe, expect, test } from "vitest";
 import type { CheckInProgress } from "./api";
 import {
-  CHECK_IN_KEY,
   checkInDue,
-  clearCheckInState,
   dismissCheckInPrompt,
   emptyCheckInState,
-  loadCheckInState,
+  isState,
   progressContextFor,
   recordCheckIn,
-  saveCheckInState,
   type CheckInSnapshot,
-  type CheckInStorageLike,
 } from "./checkInStorage";
 
-function stub(entries: Record<string, string> = {}): CheckInStorageLike & {
-  store: Map<string, string>;
-} {
-  const store = new Map(Object.entries(entries));
-  return {
-    store,
-    getItem: (key) => store.get(key) ?? null,
-    setItem: (key, value) => void store.set(key, value),
-    removeItem: (key) => void store.delete(key),
-  };
-}
+const roundTrip = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
 
 const progress: CheckInProgress = {
   previous_month: "2026-08",
@@ -51,33 +37,18 @@ function snapshot(month: string, balance = "1000.00"): Omit<
 }
 
 test("a complete check-in state round-trips without emotional fields", () => {
-  const storage = stub();
   const state = recordCheckIn(emptyCheckInState(), snapshot("2026-08"), null);
-  expect(saveCheckInState(storage, state)).toBe(true);
-  expect(loadCheckInState(storage)).toEqual(state);
-  expect(storage.store.get(CHECK_IN_KEY)).not.toMatch(/overwhelmed|manageable|reflection/i);
-});
-
-test("malformed or unavailable storage falls back without throwing", () => {
-  expect(loadCheckInState(stub({ [CHECK_IN_KEY]: "not json" }))).toEqual(
-    emptyCheckInState(),
-  );
-  expect(loadCheckInState(null)).toEqual(emptyCheckInState());
-  expect(saveCheckInState(null, emptyCheckInState())).toBe(false);
-  expect(clearCheckInState(null)).toBe(false);
+  expect(isState(roundTrip(state))).toBe(true);
+  expect(JSON.stringify(state)).not.toMatch(/overwhelmed|manageable|reflection/i);
 });
 
 test("valid-looking duplicate or unsorted months are rejected", () => {
   const first = recordCheckIn(emptyCheckInState(), snapshot("2026-08"), null);
   const second = recordCheckIn(first, snapshot("2026-09", "900.00"), null);
   const reversed = { ...second, snapshots: [...second.snapshots].reverse() };
-  expect(
-    loadCheckInState(stub({ [CHECK_IN_KEY]: JSON.stringify(reversed) })),
-  ).toEqual(emptyCheckInState());
+  expect(isState(roundTrip(reversed))).toBe(false);
   const duplicated = { ...second, snapshots: [second.snapshots[0], second.snapshots[0]] };
-  expect(
-    loadCheckInState(stub({ [CHECK_IN_KEY]: JSON.stringify(duplicated) })),
-  ).toEqual(emptyCheckInState());
+  expect(isState(roundTrip(duplicated))).toBe(false);
 });
 
 test("same-month saves replace the snapshot and correct the only baseline", () => {
@@ -137,19 +108,7 @@ test("an empty later portfolio remains valid without replacing the nonempty base
     { ...snapshot("2026-09", "0.00"), debts: [] },
     null,
   );
-  const storage = stub();
-  expect(saveCheckInState(storage, empty)).toBe(true);
-  expect(loadCheckInState(storage)).toEqual(empty);
+  expect(isState(roundTrip(empty))).toBe(true);
   expect(empty.baseline?.debts).toHaveLength(1);
   expect(progressContextFor(empty, "2026-10")?.previous.debts).toEqual([]);
-});
-
-test("clearing check-ins leaves unrelated profile storage untouched", () => {
-  const storage = stub({
-    [CHECK_IN_KEY]: JSON.stringify(emptyCheckInState()),
-    "debtpilot.financial-profile.v4": "profile",
-  });
-  expect(clearCheckInState(storage)).toBe(true);
-  expect(storage.store.has(CHECK_IN_KEY)).toBe(false);
-  expect(storage.store.get("debtpilot.financial-profile.v4")).toBe("profile");
 });

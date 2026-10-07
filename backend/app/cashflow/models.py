@@ -5,6 +5,10 @@ from decimal import Decimal
 from enum import Enum
 
 
+class InvalidCashFlow(ValueError):
+    """A household cash-flow input violates a domain invariant."""
+
+
 class IncomeFrequency(str, Enum):
     SALARY = "salary"
     MONTHLY = "monthly"

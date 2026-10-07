@@ -12,8 +12,15 @@ from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
 
-from .errors import InvalidDebt
-from .money import to_cents, to_rate_precision
+from .money import to_cents
+
+
+class InvalidDebt(ValueError):
+    """Raised when inputs cannot produce a meaningful simulation.
+
+    Only genuine "I cannot answer your question" cases raise it. A portfolio
+    that never pays off is a *result*, not an exception — see ``Outcome``.
+    """
 
 
 @dataclass(frozen=True)
@@ -43,7 +50,8 @@ class Debt:
         # dataclass requires object.__setattr__ to write during __post_init__.
         object.__setattr__(self, "balance", to_cents(self.balance))
         object.__setattr__(self, "minimum_payment", to_cents(self.minimum_payment))
-        object.__setattr__(self, "apr", to_rate_precision(self.apr))
+        # APR is a percent to two places, matching ``numeric(5,2)``.
+        object.__setattr__(self, "apr", to_cents(self.apr))
 
 
 def validate_portfolio(debts: Sequence[Debt], extra_payment: Decimal) -> None:
