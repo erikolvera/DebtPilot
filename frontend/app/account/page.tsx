@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { browserClient } from "@/lib/cloud/browser";
 import { accountsEnabled } from "@/lib/cloud/config";
-import { useLocalData } from "@/components/LocalDataProvider";
+import { syncLabel, useLocalData } from "@/components/LocalDataProvider";
 
 type Mode = "login" | "signup" | "forgot";
 
 export default function AccountPage() {
   const router = useRouter();
-  const { accountId, status, signOut, download } = useLocalData();
+  const { accountId, status, choice, signOut, download } = useLocalData();
   const [mode, setMode] = useState<Mode>("signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -67,7 +67,7 @@ export default function AccountPage() {
     </aside>}
     {notice && <p role="status" className="rounded-xl bg-paper p-4">{notice}</p>}
     {accountId ? <>
-      <section className="panel space-y-4"><h2 className="font-display text-2xl">Your saved plan</h2><p>Sync status: {status}</p><button className="secondary-button px-4" onClick={download}>Download JSON backup</button><button className="secondary-button ml-2 px-4" onClick={() => { void signOut(); }}>Sign out</button></section>
+      <section className="panel space-y-4"><h2 className="font-display text-2xl">Your saved plan</h2><p>{syncLabel(status, choice !== null)}</p><button className="secondary-button px-4" onClick={download}>Download JSON backup</button><button className="secondary-button ml-2 px-4" onClick={() => { void signOut(); }}>Sign out</button></section>
       <section className="panel space-y-4"><h2 className="font-display text-2xl">Delete account</h2><p>Deletion removes your sign-in and cloud plan. Download a backup first if you want to keep your data.</p><label className="block">Confirm your password<input className="mt-2 block w-full rounded-xl border p-3" type="password" autoComplete="current-password" value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} /></label><label className="flex gap-2"><input type="checkbox" checked={deleteConfirm} onChange={(event) => setDeleteConfirm(event.target.checked)} />I understand this deletes my account and cloud plan.</label><button className="secondary-button px-4" disabled={!deleteConfirm || !deletePassword || deleteWorking} onClick={() => { void deleteAccount(); }}>Delete my account</button></section>
     </> : <section className="panel space-y-4"><div className="flex gap-4"><button className="font-semibold underline" aria-pressed={mode === "login"} onClick={() => { setMode("login"); setNotice(""); }}>Log in</button><button className="font-semibold underline" aria-pressed={mode === "signup"} onClick={() => { setMode("signup"); setNotice(""); }}>Sign up</button><button className="font-semibold underline" aria-pressed={mode === "forgot"} onClick={() => { setMode("forgot"); setNotice(""); }}>Reset password</button></div><h2 className="font-display text-2xl">{mode === "signup" ? "Create an account" : mode === "forgot" ? "Reset your password" : "Welcome back"}</h2><form onSubmit={(event) => { void submit(event); }}><fieldset className="space-y-4 disabled:opacity-60" disabled={!accountsEnabled || working}><legend className="sr-only">{mode === "signup" ? "Create an account" : mode === "forgot" ? "Reset your password" : "Log in"}</legend><label className="block">Email<input required className="mt-2 block w-full rounded-xl border p-3" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label>{mode !== "forgot" && <label className="block">Password<input required className="mt-2 block w-full rounded-xl border p-3" type="password" minLength={mode === "signup" ? 12 : undefined} autoComplete={mode === "signup" ? "new-password" : "current-password"} value={password} onChange={(event) => setPassword(event.target.value)} /></label>}<button disabled={working} className="primary-button px-5">{mode === "signup" ? "Sign up" : mode === "forgot" ? "Send reset link" : "Log in"}</button></fieldset></form>{verify && <button className="secondary-button px-4" onClick={() => { void resend(); }}>Resend verification email</button>}</section>}
   </main>;

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CheckInStatusCard } from "@/components/CheckInStatusCard";
+import { accountsEnabled } from "@/lib/cloud/config";
 
 const FEATURES = [
   ["Know the real number", "See what remains after living costs and every debt minimum.", "bg-[#fff5d6]"],
@@ -28,7 +29,11 @@ export default function HomePage() {
               View saved report
             </Link>
           </div>
-          <p className="mt-5 text-sm text-ink-soft">No account. No bank connection. Your entries stay in this browser.</p>
+          <p className="mt-5 text-sm text-ink-soft">
+            {accountsEnabled
+              ? "No account required. No bank connection. Guest entries stay in this browser."
+              : "No account. No bank connection. Your entries stay in this browser."}
+          </p>
         </div>
 
         <div className="relative mx-auto w-full max-w-xl">
