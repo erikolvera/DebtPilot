@@ -13,6 +13,19 @@ import { createBackup, downloadJson } from "@/lib/cloud/export";
 function storage(): DataStorage | null { try { return window.localStorage; } catch { return null; } }
 type Choice = { browser: LocalData; cloud: CloudPlan | null; fromCache: boolean };
 type SaveState = "loading" | "saved" | "saving" | "unsynced" | "conflict";
+
+const SYNC_LABELS: Record<SaveState, string> = {
+  loading: "Loading your plan…",
+  saved: "Saved to your account",
+  saving: "Saving to your account…",
+  unsynced: "Changes waiting to sync",
+  conflict: "Review plan conflict",
+};
+
+export function syncLabel(status: SaveState, choosing: boolean) {
+  return choosing ? "Choose which plan to keep" : SYNC_LABELS[status];
+}
+
 type DataContext = {
   data: LocalData; ready: boolean; error: string | null;
   status: SaveState; accountId: string | null; choice: Choice | null;
@@ -344,13 +357,13 @@ export function LocalDataProvider({ children }: { children: React.ReactNode }) {
     return flush();
   };
   return <Context.Provider value={{ data, ready, error, status, accountId, choice, update, commit, flush, retry, choose, signOut, download }}>
-    {ready && accountId && !choice && <p role="status" className="mx-auto max-w-5xl px-5 pt-2 text-sm text-ink-soft">{status === "saved" ? "Saved to your account" : status === "saving" ? "Saving to your account…" : status === "unsynced" ? "Changes waiting to sync" : "Review plan conflict"}</p>}
+    {ready && accountId && !choice && <p role="status" className="mx-auto max-w-5xl px-5 pt-2 text-sm text-ink-soft">{syncLabel(status, false)}</p>}
     {ready && choice && <aside role="dialog" aria-label="Choose saved plan" className="mx-auto max-w-5xl rounded-2xl bg-paper p-5">
       <p className="font-semibold">Choose a plan for this account</p>
       <p className="mt-2 text-sm">This browser has {choice.browser.profile.debts.length} debts and {choice.browser.checkIns.snapshots.length} check-ins. {choice.cloud ? `The cloud plan has ${choice.cloud.data.profile.debts.length} debts and ${choice.cloud.data.checkIns.snapshots.length} check-ins.` : "No cloud plan exists yet."} Export before replacing either version.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {choice.cloud && <button className="secondary-button px-4" onClick={() => { void choose("cloud"); }}>Use cloud plan</button>}
-        <button className="primary-button px-4" onClick={() => { if (window.confirm("Replace the cloud plan with this browser’s plan and check-ins? Imported guest data will be removed after the upload succeeds.")) void choose("browser"); }}>Upload browser plan</button>
+        <button className="primary-button px-4" onClick={() => { if (window.confirm(choice.cloud ? "Replace the cloud plan with this browser’s plan and check-ins? Imported guest data will be removed after the upload succeeds." : "Save this browser’s plan and check-ins to your account? The browser copy will be removed after the upload succeeds.")) void choose("browser"); }}>Upload browser plan</button>
         {!choice.cloud && <button className="secondary-button px-4" onClick={() => { void choose("empty"); }}>Start empty cloud plan</button>}
         <button className="secondary-button px-4" onClick={download}>Download browser backup</button>
       </div>
