@@ -15,6 +15,13 @@ const publicKey = env.PUBLISHABLE_KEY || env.ANON_KEY;
 const secret = env.SECRET_KEY || env.SERVICE_ROLE_KEY;
 if (!url || !publicKey || !secret) throw new Error("Local Supabase URL or test keys are missing.");
 const admin = createClient(url, secret, { auth: { autoRefreshToken: false, persistSession: false } });
+const grants = spawnSync("psql", [env.DB_URL, "-At", "-c", `
+  select grantee || ':' || string_agg(privilege_type, ',' order by privilege_type)
+  from information_schema.role_table_grants
+  where table_schema = 'public' and table_name = 'plans' and grantee in ('anon', 'authenticated', 'service_role')
+  group by grantee order by grantee`], { encoding: "utf8" });
+assert.equal(grants.status, 0, grants.stderr);
+assert.equal(grants.stdout.trim(), "authenticated:SELECT\nservice_role:SELECT", "plans privileges must not depend on project defaults.");
 const users = [];
 const plan = (amount) => ({ version: 1,
   profile: { incomes: [{ id: "income", name: "Pay", amount, frequency: "monthly" }], expenses: [], debts: [], extra: "0.00", preferredStrategy: null },
@@ -33,6 +40,8 @@ try {
     users[i] = { id: users[i], client };
   }
   const [a, b] = users;
+  const anonymous = await createClient(url, publicKey, { auth: { autoRefreshToken: false, persistSession: false } }).from("plans").select("user_id");
+  assert.equal(anonymous.error?.code, "42501", "Anonymous requests must not be able to read plans.");
   const first = await a.client.rpc("save_plan", { p_data: plan("1000.00"), p_expected_revision: null, p_mutation_id: randomUUID() });
   assert.ifError(first.error);
   assert.equal(first.data.revision, 1);
