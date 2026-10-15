@@ -1,5 +1,16 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+type Income = { name: string; frequency: string; amount: string };
+type Expense = { name: string; category: string; amount: string };
+type Debt = { name: string; type: string; balance: string; apr: string; minimum: string };
+type Plan = { incomes: Income[]; expenses: Expense[]; debts: Debt[]; extra: string };
+
+// Shared by both scenarios: $350 in debt minimums and $11,000 total debt.
+const DEBTS: Debt[] = [
+  { name: "Visa", type: "credit_card", balance: "3000.00", apr: "20.00", minimum: "100.00" },
+  { name: "Car loan", type: "auto_loan", balance: "8000.00", apr: "6.00", minimum: "250.00" },
+];
+
 // The figure a <dt> labels inside a <dl>, e.g. value(cashFlow, "Total debt").
 function value(scope: Locator, term: string): Locator {
   return scope
@@ -15,56 +26,64 @@ async function removeAllRows(section: Locator) {
   while ((await remove.count()) > 0) await remove.first().click();
 }
 
-async function addIncome(page: Page, name: string, frequency: string, amount: string) {
-  const section = page.getByRole("region", { name: "Monthly income" });
-  await section.getByRole("button", { name: "Add income" }).click();
-  await section.getByRole("textbox", { name: "Income source name" }).last().fill(name);
-  await section.getByRole("combobox", { name: `${name} — pay frequency` }).selectOption(frequency);
-  await section.getByRole("textbox", { name: `${name} — take-home amount` }).fill(amount);
+// Steps 1 and 2 of the planner, through the UI. Leaves the browser on the
+// debts page so a scenario can check it before continuing to the report.
+async function enterPlan(page: Page, plan: Plan) {
+  await page.goto("/plan/cash-flow");
+  await expect(page.getByRole("heading", { name: "Start with your monthly reality." })).toBeVisible();
+
+  const income = page.getByRole("region", { name: "Monthly income" });
+  await removeAllRows(income);
+  for (const row of plan.incomes) {
+    await income.getByRole("button", { name: "Add income" }).click();
+    await income.getByRole("textbox", { name: "Income source name" }).last().fill(row.name);
+    await income.getByRole("combobox", { name: `${row.name} — pay frequency` }).selectOption(row.frequency);
+    await income.getByRole("textbox", { name: `${row.name} — take-home amount` }).fill(row.amount);
+  }
+
+  const expenses = page.getByRole("region", { name: "Monthly expenses" });
+  await removeAllRows(expenses);
+  for (const row of plan.expenses) {
+    await expenses.getByRole("button", { name: "Add expense" }).click();
+    await expenses.getByRole("textbox", { name: "Expense name" }).last().fill(row.name);
+    await expenses.getByRole("combobox", { name: `${row.name} — category` }).selectOption(row.category);
+    await expenses.getByRole("textbox", { name: `${row.name} — monthly amount` }).fill(row.amount);
+  }
+  await page.getByRole("link", { name: "Continue to debts →" }).click();
+
+  await expect(page.getByRole("heading", { name: "Add the debts you want to tackle." })).toBeVisible();
+  const debts = page.getByRole("region", { name: "Debts" });
+  await removeAllRows(debts);
+  for (const debt of plan.debts) {
+    await debts.getByRole("button", { name: "Add debt" }).click();
+    await debts.getByRole("textbox", { name: "Debt name" }).last().fill(debt.name);
+    await debts.getByRole("combobox", { name: `${debt.name} — debt type` }).selectOption(debt.type);
+    await debts.getByRole("textbox", { name: `${debt.name} — balance owed` }).fill(debt.balance);
+    await debts.getByRole("textbox", { name: `${debt.name} — annual percentage rate` }).fill(debt.apr);
+    await debts.getByRole("textbox", { name: `${debt.name} — minimum payment` }).fill(debt.minimum);
+  }
+  await page.getByRole("textbox", { name: "Extra payment each month, in dollars" }).fill(plan.extra);
 }
 
-async function addExpense(page: Page, name: string, category: string, amount: string) {
-  const section = page.getByRole("region", { name: "Monthly expenses" });
-  await section.getByRole("button", { name: "Add expense" }).click();
-  await section.getByRole("textbox", { name: "Expense name" }).last().fill(name);
-  await section.getByRole("combobox", { name: `${name} — category` }).selectOption(category);
-  await section.getByRole("textbox", { name: `${name} — monthly amount` }).fill(amount);
-}
-
-type Debt = { name: string; type: string; balance: string; apr: string; minimum: string };
-
-async function addDebt(page: Page, debt: Debt) {
-  const section = page.getByRole("region", { name: "Debts" });
-  await section.getByRole("button", { name: "Add debt" }).click();
-  await section.getByRole("textbox", { name: "Debt name" }).last().fill(debt.name);
-  await section.getByRole("combobox", { name: `${debt.name} — debt type` }).selectOption(debt.type);
-  await section.getByRole("textbox", { name: `${debt.name} — balance owed` }).fill(debt.balance);
-  await section.getByRole("textbox", { name: `${debt.name} — annual percentage rate` }).fill(debt.apr);
-  await section.getByRole("textbox", { name: `${debt.name} — minimum payment` }).fill(debt.minimum);
+async function openReport(page: Page) {
+  await page.getByRole("link", { name: "See my report →" }).click();
+  await expect(page).toHaveURL(/\/report$/);
 }
 
 test("successful debt-payoff plan with a monthly surplus", async ({ page }) => {
-  // Step 1: cash flow. $5,000 income vs $2,000 expenses + $350 minimums.
-  await page.goto("/plan/cash-flow");
-  await expect(page.getByRole("heading", { name: "Start with your monthly reality." })).toBeVisible();
-  await removeAllRows(page.getByRole("region", { name: "Monthly income" }));
-  await removeAllRows(page.getByRole("region", { name: "Monthly expenses" }));
+  // $5,000 income vs $2,000 expenses + $350 minimums.
+  await enterPlan(page, {
+    incomes: [{ name: "Paycheck", frequency: "monthly", amount: "5000.00" }],
+    expenses: [
+      { name: "Rent", category: "housing", amount: "1500.00" },
+      { name: "Groceries", category: "food", amount: "500.00" },
+    ],
+    debts: DEBTS,
+    extra: "500.00",
+  });
+  await openReport(page);
 
-  await addIncome(page, "Paycheck", "monthly", "5000.00");
-  await addExpense(page, "Rent", "housing", "1500.00");
-  await addExpense(page, "Groceries", "food", "500.00");
-  await page.getByRole("link", { name: "Continue to debts →" }).click();
-
-  // Step 2: debts and the optional extra payment.
-  await expect(page.getByRole("heading", { name: "Add the debts you want to tackle." })).toBeVisible();
-  await removeAllRows(page.getByRole("region", { name: "Debts" }));
-  await addDebt(page, { name: "Visa", type: "credit_card", balance: "3000.00", apr: "20.00", minimum: "100.00" });
-  await addDebt(page, { name: "Car loan", type: "auto_loan", balance: "8000.00", apr: "6.00", minimum: "250.00" });
-  await page.getByRole("textbox", { name: "Extra payment each month, in dollars" }).fill("500.00");
-  await page.getByRole("link", { name: "See my report →" }).click();
-
-  // Step 3: the report. Every figure below is derivable by hand from the inputs.
-  await expect(page).toHaveURL(/\/report$/);
+  // Every cash-flow figure below is derivable by hand from the inputs.
   const cashFlow = page.getByRole("region", { name: "Cash flow" });
   await expect(cashFlow.getByRole("status")).toHaveText("Monthly budget has a surplus");
   await expect(value(cashFlow, "Monthly income")).toHaveText("$5,000.00");
@@ -92,4 +111,44 @@ test("successful debt-payoff plan with a monthly surplus", async ({ page }) => {
     await expect(value(card(strategy), "Interest")).toHaveText("$519.12");
     await expect(card(strategy).getByRole("button", { name: `Choose ${strategy}` })).toBeEnabled();
   }
+});
+
+test("deficit budget shows the shortfall and withholds an accelerated plan", async ({ page }) => {
+  // Edge case: income covers living expenses ($3,000 > $2,800) but not the
+  // $350 in debt minimums too, so the budget is $150 short each month.
+  await enterPlan(page, {
+    incomes: [{ name: "Paycheck", frequency: "monthly", amount: "3000.00" }],
+    expenses: [
+      { name: "Rent", category: "housing", amount: "2000.00" },
+      { name: "Groceries", category: "food", amount: "800.00" },
+    ],
+    debts: DEBTS,
+    extra: "500.00",
+  });
+
+  // The requested $500 extra is capped at the non-negative cash flow: $0.
+  await expect(page.getByText("Budget supports up to $0.00. The payoff plan uses $0.00 instead.")).toBeVisible();
+  await openReport(page);
+
+  const cashFlow = page.getByRole("region", { name: "Cash flow" });
+  await expect(cashFlow.getByRole("status")).toHaveText("Monthly budget has a shortfall");
+  await expect(value(cashFlow, "Monthly income")).toHaveText("$3,000.00");
+  await expect(value(cashFlow, "Monthly expenses")).toHaveText("$2,800.00");
+  await expect(value(cashFlow, "Debt minimums")).toHaveText("$350.00");
+  await expect(value(cashFlow, "Available each month")).toHaveText("-$150.00"); // 3000 − 2800 − 350
+  await expect(value(cashFlow, "Monthly shortfall")).toHaveText("$150.00");
+  await expect(value(cashFlow, "Total debt")).toHaveText("$11,000.00");
+
+  await expect(page.getByRole("region", { name: "Debt payment budget" })).toHaveText(
+    /Income falls short by \$150\.00 each month\. An accelerated plan would not be realistic yet\./,
+  );
+
+  // A deficit never produces an accelerated payoff recommendation.
+  const payoff = page.getByRole("region", { name: "Payoff strategies" });
+  await expect(payoff).toContainText("Close the monthly shortfall before choosing Snowball or Avalanche.");
+  await expect(page.getByRole("group", { name: "Choose a payoff strategy" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Choose (Snowball|Avalanche)$/ })).toHaveCount(0);
+
+  const nextSteps = page.getByRole("region", { name: "Recommended next steps" });
+  await expect(nextSteps.getByRole("heading", { name: "Close the monthly shortfall first" })).toBeVisible();
 });

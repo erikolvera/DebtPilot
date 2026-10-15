@@ -38,18 +38,38 @@ deployed API or depend on your own dev server.
 | # | Scenario | What it proves |
 |---|---|---|
 | 1 | Successful debt-payoff plan with a monthly surplus | Income, expenses, debts and extra payment entered in the UI produce the right cash flow, payment budget and payoff estimates on the report |
+| 2 | Deficit budget (edge case) | When debt minimums push a budget into deficit, the app shows the shortfall, caps the requested extra payment at $0, and offers no Snowball or Avalanche plan |
 
-Test data for scenario 1 (income higher than all monthly outflows):
+Both scenarios use the same debts: Visa $3,000.00 at 20% with a $100.00
+minimum, and Car loan $8,000.00 at 6% with a $250.00 minimum. That's $350.00
+in minimums and $11,000.00 of total debt. Both request a $500.00 extra payment.
 
-- Income: Paycheck, monthly, $5,000.00
-- Expenses: Rent $1,500.00 and Groceries $500.00, for $2,000.00 in total
-- Debts: Visa $3,000.00 at 20% with a $100.00 minimum, and Car loan $8,000.00 at 6% with a $250.00 minimum, for $350.00 in minimums
-- Extra payment: $500.00
+| | Scenario 1 (surplus) | Scenario 2 (deficit) |
+|---|---|---|
+| Income (monthly) | Paycheck $5,000.00 | Paycheck $3,000.00 |
+| Expenses | Rent $1,500.00 + Groceries $500.00 | Rent $2,000.00 + Groceries $800.00 |
+| Available each month | $5,000 − $2,000 − $350 = **$2,650.00** | $3,000 − $2,800 − $350 = **−$150.00** |
+| Extra payment used | $500.00 ($2,150.00 left unassigned) | $0.00 (capped) |
 
-The expected cash-flow figures can be checked by hand: $5,000 − $2,000 − $350
-= $2,650 available, and $2,650 − $500 = $2,150 left unassigned. The payoff
-durations and interest come from the deterministic engine and don't depend on
-the current month, so the assertions are stable.
+Scenario 2 is set up on purpose so income covers living expenses but not the
+debt minimums too. The test passes only if minimums count toward cash flow.
+
+The expected cash-flow figures can be checked by hand. The payoff durations
+and interest in scenario 1 come from the deterministic engine and don't depend
+on the current month, so the assertions are stable.
+
+### Demonstrating a controlled failure
+
+In `backend/app/cashflow/analysis.py`, change
+`available = to_cents(income - spending - minimums)` to
+`available = to_cents(income - spending)`, then run `npm run test:ui`. Both
+tests fail:
+
+- Scenario 1: `Expected "$2,650.00", Received "$3,000.00"`.
+- Scenario 2: the debts page offers $200 of extra payment instead of capping
+  it at $0.
+
+Revert with `git checkout -- backend/app/cashflow/analysis.py`.
 
 ## Setup, data and cleanup
 
