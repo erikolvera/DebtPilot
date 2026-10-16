@@ -18,8 +18,7 @@ Then, from `frontend/`:
 ```bash
 npm run test:ui                       # headless
 npm run test:ui:headed                # visible browser
-SLOWMO=400 npm run test:ui:headed     # visible, slowed down for a demo
-npx playwright test --ui              # interactive runner with time-travel
+SLOWMO=700 npm run test:ui:headed     # visible, slowed down for a demo
 ```
 
 To inspect a failure, list the traces and open one. A trace is kept only when

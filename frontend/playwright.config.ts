@@ -4,9 +4,14 @@ import { defineConfig, devices } from "@playwright/test";
 // deployed API: the browser talks only to the servers started below.
 const WEB = "http://127.0.0.1:3100";
 const API = "http://127.0.0.1:8100";
+// SLOWMO=700 pauses each action 700ms for a watchable headed demo.
+const SLOWMO = Number(process.env.SLOWMO ?? 0);
 
 export default defineConfig({
   testDir: "e2e",
+  // Slow motion stretches every action, so lift the 30s per-test default
+  // rather than let a demo run time out.
+  timeout: SLOWMO ? 180_000 : 30_000,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
@@ -14,8 +19,7 @@ export default defineConfig({
     baseURL: WEB,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    // SLOWMO=400 slows each action for a watchable headed demo.
-    launchOptions: { slowMo: Number(process.env.SLOWMO ?? 0) },
+    launchOptions: { slowMo: SLOWMO },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
