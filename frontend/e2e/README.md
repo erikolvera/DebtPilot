@@ -21,13 +21,8 @@ npm run test:ui:headed                # visible browser
 SLOWMO=700 npm run test:ui:headed     # visible, slowed down for a demo
 ```
 
-To inspect a failure, list the traces and open one. A trace is kept only when
-a test fails, and `test-results/` is cleared at the start of every run:
-
-```bash
-ls test-results/*/trace.zip
-npx playwright show-trace test-results/debt-payoff-successful-deb-52429-plan-with-a-monthly-surplus-chromium/trace.zip
-```
+When a test fails, its output ends with an `npx playwright show-trace …`
+command; run it to replay the failed run step by step.
 
 Playwright starts both servers itself (`playwright.config.ts`):
 
