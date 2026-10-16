@@ -43,3 +43,7 @@ frontend/next-env.d.ts
 
 # Local scratch output
 output/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+frontend/test-results/
+frontend/playwright-report/
