@@ -113,6 +113,9 @@ test("successful debt-payoff plan with a monthly surplus", async ({ page }) => {
   }
 });
 
+
+
+// SCENARIO 2: Deficit budget
 test("deficit budget shows the shortfall and withholds an accelerated plan", async ({ page }) => {
   // Edge case: income covers living expenses ($3,000 > $2,800) but not the
   // $350 in debt minimums too, so the budget is $150 short each month.
