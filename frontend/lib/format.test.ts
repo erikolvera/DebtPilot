@@ -25,11 +25,7 @@ describe("money", () => {
     expect(money("6120.00")).toBe("$6,120.00");
     expect(money("91219.95")).toBe("$91,219.95");
     expect(money("0.00")).toBe("$0.00");
-  });
-
-  test("formats the contract's maximum exactly", () => {
-    // MONEY_MAX on the server. Worth pinning: this is where a float would
-    // first visibly lose a cent.
+    // MONEY_MAX on the server: where a float would first visibly lose a cent.
     expect(money("99999999.99")).toBe("$99,999,999.99");
   });
 
@@ -58,11 +54,8 @@ describe("monthCount", () => {
 });
 
 describe("delta", () => {
-  test("renders a null delta as an em dash rather than computing one", () => {
+  test("renders a null delta as an em dash and a present one as money", () => {
     expect(delta(null)).toBe("—");
-  });
-
-  test("formats a present delta as money", () => {
     expect(delta("534.72")).toBe("$534.72");
   });
 });
@@ -87,8 +80,10 @@ describe("scenarioFigures", () => {
       scenario({
         strategy: "minimum_only",
         outcome: "never_pays_off",
-        months_to_payoff: null,
-        payoff_month: null,
+        // Defence in depth: the guard keys on `outcome`, never on whether the
+        // other fields happen to be null.
+        months_to_payoff: 876,
+        payoff_month: "2099-01",
         total_interest_paid: "91219.95",
         total_paid: "93377.74",
         underwater_debt_ids: ["visa"],
@@ -103,14 +98,4 @@ describe("scenarioFigures", () => {
     expect(figures.underwaterIds).toEqual(["visa"]);
   });
 
-  test("suppresses totals even when the API populates a payoff month", () => {
-    // Defence in depth: the guard keys on `outcome`, never on whether the
-    // other fields happen to be null.
-    const figures = scenarioFigures(
-      scenario({ outcome: "never_pays_off", payoff_month: "2099-01", months_to_payoff: 876 }),
-    );
-    expect(figures.totalInterest).toBeNull();
-    expect(figures.payoffMonth).toBeNull();
-    expect(figures.months).toBeNull();
-  });
 });

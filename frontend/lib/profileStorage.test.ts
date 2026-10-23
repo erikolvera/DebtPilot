@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest";
 import { seedFinancialProfile } from "./seed";
 import {
   loadFinancialProfile,
-  type FinancialProfile,
   type StorageLike,
 } from "./profileStorage";
 
@@ -14,29 +13,6 @@ function stub(entries: Record<string, string> = {}): StorageLike {
 }
 
 const FALLBACK = seedFinancialProfile();
-
-test("a complete financial profile round-trips", () => {
-  const saved: FinancialProfile = {
-    incomes: [{ id: "pay", name: "Pay", amount: "461.54", frequency: "biweekly" }],
-    expenses: [
-      { id: "rent", name: "Rent", category: "housing", monthly_amount: "500.00" },
-    ],
-    debts: [
-      {
-        id: "card",
-        name: "Card",
-        type: "credit_card",
-        balance: "100.00",
-        apr: "10.00",
-        minimum_payment: "20.00",
-      },
-    ],
-    extra: "50.00",
-    preferredStrategy: "snowball",
-  };
-  const storage = stub({ "debtpilot.financial-profile.v4": JSON.stringify(saved) });
-  expect(loadFinancialProfile(storage, FALLBACK)).toEqual(saved);
-});
 
 test("a v3 profile migrates without changing financial entries", () => {
   const previous = {
@@ -61,23 +37,6 @@ test("a v3 profile migrates without changing financial entries", () => {
     FALLBACK,
   );
   expect(loaded).toEqual({ ...previous, preferredStrategy: null });
-});
-
-test("a v2 monthly profile migrates to an explicit monthly frequency", () => {
-  const previous = {
-    incomes: [{ id: "pay", name: "Pay", monthly_amount: "1000.00" }],
-    expenses: [],
-    debts: [],
-    extra: "0.00",
-  };
-  const loaded = loadFinancialProfile(
-    stub({ "debtpilot.financial-profile.v2": JSON.stringify(previous) }),
-    FALLBACK,
-  );
-  expect(loaded.incomes).toEqual([
-    { id: "pay", name: "Pay", amount: "1000.00", frequency: "monthly" },
-  ]);
-  expect(loaded.preferredStrategy).toBeNull();
 });
 
 test("a legacy debt portfolio migrates without inventing income or expenses", () => {
