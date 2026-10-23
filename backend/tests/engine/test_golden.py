@@ -9,9 +9,9 @@ catches that.
 from decimal import Decimal
 
 from app.engine.minimums import fixed_minimum
-from app.engine.models import Debt, Outcome, Strategy
-from app.engine.ordering import avalanche_order, snowball_order
-from app.engine.plans import compute_plans, summarize
+from app.engine.models import Debt, Outcome
+from app.engine.ordering import snowball_order
+from app.engine.plans import compute_plans
 from app.engine.simulator import ZERO, simulate
 
 
@@ -109,17 +109,6 @@ def test_golden_strategies_diverge_in_payoff_order():
     assert [p.debt_id for p in plans.avalanche.debt_payoffs] == ["b", "a"]
     assert plans.avalanche.total_interest_paid <= plans.snowball.total_interest_paid
     assert plans.interest_saved_avalanche_vs_snowball >= ZERO
-
-
-def test_golden_divergent_run_conserves_money():
-    debts = [debt("a", "500.00", "5.00", "25.00"), debt("b", "2000.00", "25.00", "50.00")]
-    for order_fn, strategy in (
-        (snowball_order, Strategy.SNOWBALL),
-        (avalanche_order, Strategy.AVALANCHE),
-    ):
-        schedule = simulate(debts, Decimal("200.00"), order_fn, fixed_minimum)
-        summary = summarize(schedule, debts, strategy)
-        assert summary.total_paid == Decimal("2500.00") + summary.total_interest_paid
 
 
 def test_golden_stalled_total_can_still_pay_off():

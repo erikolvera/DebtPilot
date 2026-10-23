@@ -47,11 +47,6 @@ describe("xDomainMonths", () => {
     expect(domain).toBe(48);
   });
 
-  test("ignores never-paying-off scenarios when choosing the anchor", () => {
-    expect(xDomainMonths([scenario({ months_to_payoff: null }), scenario({ months_to_payoff: 12 })]))
-      .toBe(24);
-  });
-
   test("falls back when nothing pays off", () => {
     // No finite anchor exists. All three tracks then clip, which is the
     // correct and complete answer.

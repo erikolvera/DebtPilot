@@ -40,19 +40,6 @@ def test_mapper_preserves_scenarios_totals_dates_and_deltas():
     )
 
 
-def test_debt_payoff_rows_keep_the_engine_values():
-    comparison = compute_plans(PORTFOLIO, Decimal("200.00"))
-    response = to_response(comparison, "2026-09")
-    wire = response.scenarios.snowball.debt_payoffs[0]
-    source = comparison.snowball.debt_payoffs[0]
-
-    assert wire.debt_id == source.debt_id
-    assert wire.name == source.name
-    assert wire.months_to_payoff == source.payoff_month
-    assert wire.payoff_month == month_label("2026-09", source.payoff_month)
-    assert wire.total_interest_paid == source.total_interest_paid
-
-
 def test_never_pays_off_has_no_payoff_month():
     response = to_response(
         compute_plans(

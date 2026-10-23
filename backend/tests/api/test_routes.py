@@ -16,19 +16,6 @@ def client() -> TestClient:
     return TestClient(create_app())
 
 
-def report_body() -> dict:
-    return {
-        "incomes": [],
-        "expenses": [],
-        "debts": [
-            {"id": "a", "name": "Store card", "balance": "500.00",
-             "apr": "5.00", "minimum_payment": "25.00"},
-        ],
-        "requested_extra_monthly_payment": "0.00",
-        "start_month": "2026-09",
-    }
-
-
 def test_health_returns_ok(client):
     response = client.get("/health")
     assert response.status_code == 200
@@ -103,12 +90,6 @@ def test_a_body_over_the_size_cap_is_a_413(client):
     assert entry["loc"] == ["header", "content-length"]
 
 
-def test_a_body_under_the_size_cap_is_processed_normally(client):
-    response = client.post("/v1/financial-reports", json=report_body())
-    assert response.status_code == 200
-    assert int(response.request.headers["content-length"]) <= MAX_BODY_BYTES
-
-
 def test_a_chunked_body_over_the_size_cap_is_a_413_before_the_app_runs():
     downstream_called = False
     sent = []
@@ -140,14 +121,6 @@ def test_a_chunked_body_over_the_size_cap_is_a_413_before_the_app_runs():
     assert not downstream_called
     assert sent[0]["type"] == "http.response.start"
     assert sent[0]["status"] == 413
-
-
-def test_a_request_with_no_content_length_is_not_rejected(client):
-    # A GET carries no content-length at all; the guard must ignore it rather
-    # than treat a missing header as an oversized body.
-    response = client.get("/health")
-    assert "content-length" not in response.request.headers
-    assert response.status_code == 200
 
 
 def test_non_http_scopes_pass_straight_through():

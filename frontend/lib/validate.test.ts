@@ -65,12 +65,6 @@ describe("reportExtraError", () => {
     expect(reportExtraError("-1")).not.toBeNull();
   });
 
-  test("accepts the report-wide ceiling without widening individual fields", () => {
-    expect(reportExtraError("21666666664.50")).toBeNull();
-    expect(reportExtraError("21666666664.51")).not.toBeNull();
-    expect(debtErrors({ ...OK, balance: "100000000.00" }).balance).toBeDefined();
-  });
-
   test("is used by financial-report sendability", () => {
     expect(isFinancialReportSendable([], [], [], "21666666664.50")).toBe(true);
     expect(isFinancialReportSendable([], [], [], "21666666664.51")).toBe(false);

@@ -34,15 +34,9 @@ function option(): PaymentOption {
 }
 
 describe("effectiveStrategy", () => {
-  test("uses a saved preference before the recommendation", () => {
+  test("prefers the saved choice, then the recommendation, then Avalanche", () => {
     expect(effectiveStrategy("snowball", "avalanche")).toBe("snowball");
-  });
-
-  test("uses the recommendation when there is no preference", () => {
     expect(effectiveStrategy(null, "snowball")).toBe("snowball");
-  });
-
-  test("falls back to Avalanche when neither is available", () => {
     expect(effectiveStrategy(null, null)).toBe("avalanche");
   });
 });

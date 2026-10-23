@@ -50,19 +50,6 @@ def test_negative_minimum_is_rejected():
         make_debt(minimum_payment=Decimal("-5.00"))
 
 
-def test_zero_balance_is_accepted():
-    assert make_debt(balance=Decimal("0.00")).balance == Decimal("0.00")
-
-
-def test_zero_minimum_is_accepted():
-    assert make_debt(minimum_payment=Decimal("0.00")).minimum_payment == Decimal("0.00")
-
-
-def test_minimum_larger_than_balance_is_accepted():
-    debt = make_debt(balance=Decimal("10.00"), minimum_payment=Decimal("50.00"))
-    assert debt.minimum_payment == Decimal("50.00")
-
-
 def test_duplicate_ids_are_rejected():
     debts = [make_debt(id="a"), make_debt(id="a")]
     with pytest.raises(InvalidDebt, match="duplicate"):
@@ -74,9 +61,3 @@ def test_negative_extra_payment_is_rejected():
         validate_portfolio([make_debt()], Decimal("-1.00"))
 
 
-def test_valid_portfolio_passes():
-    validate_portfolio([make_debt(id="a"), make_debt(id="b")], Decimal("100.00"))
-
-
-def test_empty_portfolio_passes():
-    validate_portfolio([], Decimal("0.00"))

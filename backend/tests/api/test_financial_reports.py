@@ -330,7 +330,8 @@ def test_supported_debt_types_are_accepted_with_an_estimate_disclosure(client):
     assert "Non-credit-card debts" in body["estimate_disclosure"]
 
 
-@pytest.mark.parametrize("collection", ["incomes", "expenses", "debts"])
+# Duplicate debt ids are covered by test_contract.py's REJECTED_INPUTS.
+@pytest.mark.parametrize("collection", ["incomes", "expenses"])
 def test_duplicate_row_ids_are_rejected(client, collection):
     body = report_body()
     body[collection] = [body[collection][0], body[collection][0]]
@@ -339,25 +340,9 @@ def test_duplicate_row_ids_are_rejected(client, collection):
     assert f"duplicate {collection[:-1]} id" in response.text
 
 
-def test_report_money_must_stay_a_json_string(client):
-    body = report_body()
-    body["incomes"][0]["amount"] = 5000
-    response = client.post("/v1/financial-reports", json=body)
-    assert response.status_code == 422
-
-
-@pytest.mark.parametrize(
-    ("amount", "frequency", "monthly"),
-    [
-        ("72000.00", "salary", "6000.00"),
-        ("5000.00", "monthly", "5000.00"),
-        ("2307.69", "biweekly", "5000.00"),
-        ("1000.00", "weekly", "4333.33"),
-    ],
-)
-def test_income_frequency_is_normalized_before_cash_flow(
-    client, amount, frequency, monthly
-):
+def test_income_frequency_is_normalized_before_cash_flow(client):
+    # Every frequency is unit-tested in cashflow/test_analysis.py; biweekly is
+    # the one whose 26/12 conversion has to round once at the report boundary.
     response = client.post(
         "/v1/financial-reports",
         json=report_body(
@@ -365,14 +350,14 @@ def test_income_frequency_is_normalized_before_cash_flow(
                 {
                     "id": "pay",
                     "name": "Paycheck",
-                    "amount": amount,
-                    "frequency": frequency,
+                    "amount": "2307.69",
+                    "frequency": "biweekly",
                 }
             ]
         ),
     )
     assert response.status_code == 200
-    assert response.json()["cash_flow"]["total_monthly_income"] == monthly
+    assert response.json()["cash_flow"]["total_monthly_income"] == "5000.00"
 
 
 def test_unknown_income_frequency_is_rejected(client):

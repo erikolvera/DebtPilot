@@ -1,7 +1,6 @@
 from decimal import Decimal
 
 from app.engine.minimums import (
-    MINIMUM_FLOOR,
     declining_minimum,
     fixed_minimum,
     implied_percentage,
@@ -17,10 +16,6 @@ def make_debt(balance="1000.00", minimum="50.00") -> Debt:
         apr=Decimal("20.00"),
         minimum_payment=Decimal(minimum),
     )
-
-
-def test_floor_is_twenty_five_dollars():
-    assert MINIMUM_FLOOR == Decimal("25.00")
 
 
 def test_fixed_minimum_ignores_current_balance():

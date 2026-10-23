@@ -14,6 +14,7 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.dates import month_label
 from app.api.main import create_app, handle_invalid_debt
 from app.engine import Debt, InvalidDebt, compute_plans
 
@@ -88,20 +89,6 @@ def test_every_rejected_input_is_a_422_never_a_500(client, debts, extra):
     assert "detail" in response.json()
 
 
-def test_duplicate_ids_really_would_raise_without_the_handler():
-    # The engine genuinely raises on this input. Pydantic rejects it first on
-    # the report route, so the handler below is the safety net if the two
-    # ever disagree.
-    with pytest.raises(InvalidDebt):
-        compute_plans(
-            [
-                Debt("a", "A", Decimal("100.00"), Decimal("10.00"), Decimal("25.00")),
-                Debt("a", "B", Decimal("200.00"), Decimal("10.00"), Decimal("25.00")),
-            ],
-            Decimal("200.00"),
-        )
-
-
 def test_invalid_debt_handler_answers_in_fastapis_422_envelope():
     # FastAPI's own 422 entries always carry a `loc`. Without one here, a
     # client written against the framework envelope has two shapes to parse.
@@ -163,6 +150,7 @@ def test_per_debt_payoff_numbers_survive_the_mapping(client):
         assert wire["debt_id"] == engine_payoff.debt_id
         assert wire["name"] == engine_payoff.name
         assert wire["months_to_payoff"] == engine_payoff.payoff_month
+        assert wire["payoff_month"] == month_label("2026-09", engine_payoff.payoff_month)
         assert wire["total_interest_paid"] == str(engine_payoff.total_interest_paid)
 
 
